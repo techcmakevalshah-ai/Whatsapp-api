@@ -9,7 +9,7 @@ const items = [
   [Settings, 'Settings'],
 ] as const;
 
-export function Sidebar({ onHistory }: { onHistory: () => void }) {
+export function Sidebar({ onHistory, onTemplates }: { onHistory: () => void; onTemplates: () => void }) {
   return (
     <aside className="sidebar">
       <div className="brand"><span className="brand-mark">◎</span><span>CMA Keval Shah</span></div>
@@ -21,7 +21,7 @@ export function Sidebar({ onHistory }: { onHistory: () => void }) {
         ))}
         <div className="subnav active-sub">New Campaign</div>
         <button className="subnav subnav-button" onClick={onHistory}>Campaign History</button>
-        <div className="subnav">Message Templates</div>
+        <button className="subnav subnav-button" onClick={onTemplates}>Message Templates</button>
       </nav>
       <div className="sidebar-help"><b>WhatsApp Official</b><span>Google Sheets → approved template → delivery tracking</span></div>
     </aside>
