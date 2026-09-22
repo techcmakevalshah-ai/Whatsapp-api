@@ -50,3 +50,26 @@
 .media-upload-success small{color:#5c7664}
 .media-url-fallback{margin-top:10px}
 .media-url-fallback summary{cursor:pointer;color:#6b7280;font-size:11px;margin-bottom:8px}
+
+.preview-bubble{overflow:hidden;padding-top:10px}
+.preview-media{display:block;width:100%;max-height:280px;object-fit:cover;border-radius:7px;margin-bottom:10px;background:#e5e7eb}
+.preview-bubble video.preview-media{object-fit:contain;background:#000}
+.preview-media-placeholder{border:1px dashed #cbd5e1;background:#f8fafc;color:#64748b;border-radius:7px;padding:22px 12px;text-align:center;font-size:12px;margin-bottom:10px}
+.preview-message-text{padding-bottom:2px}
+.campaign-action-row{display:grid;grid-template-columns:.38fr .62fr;gap:10px}
+.campaign-send-btn{width:100%}
+.test-send-btn{justify-content:center;border:1px solid #b9c8e4;background:#eef4ff;color:#2454b8;padding:13px}
+.test-send-btn:disabled{opacity:.5;cursor:not-allowed}
+.test-modal-backdrop{justify-content:center;align-items:center;padding:18px}
+.test-message-modal{width:min(480px,96vw);max-height:90vh;overflow:auto;background:#fff;border-radius:14px;padding:22px;box-shadow:0 24px 70px rgba(15,23,42,.25)}
+.test-template-summary{display:flex;justify-content:space-between;gap:12px;align-items:center;border:1px solid #e1e7ef;background:#f8fafc;border-radius:8px;padding:11px 12px;margin-bottom:14px}
+.test-template-summary{font-size:12px}.test-template-summary span{color:#64748b}
+.test-message-form{display:flex;flex-direction:column;gap:14px}
+.test-message-form label{display:flex;flex-direction:column;gap:7px;font-size:12px;font-weight:700;color:#334155}
+.test-message-form input{border:1px solid #dbe3ec;border-radius:8px;padding:11px 12px;font:inherit;outline:none}
+.test-message-form input:focus{border-color:#16a34a;box-shadow:0 0 0 3px rgba(22,163,74,.09)}
+.test-message-form small{font-weight:400;color:#7b8798}
+.test-note{display:flex;flex-wrap:wrap;gap:5px;align-items:center;padding:10px 11px;border:1px solid #dbe5ef;background:#f8fafc;border-radius:8px;color:#64748b;font-size:11px}
+.test-note code{background:#e9eef5;color:#334155;padding:2px 5px;border-radius:4px}
+.test-success{background:#effaf2;border:1px solid #ccebd4;color:#176b37;padding:10px 12px;border-radius:8px;margin-bottom:12px}
+@media(max-width:700px){.campaign-action-row{grid-template-columns:1fr}}
