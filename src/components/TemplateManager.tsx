@@ -16,6 +16,7 @@ type FormState = {
   body: string;
   footer: string;
   status: 'DRAFT' | 'APPROVED';
+  headerType: '' | 'IMAGE' | 'VIDEO';
   confirmProviderApproved: boolean;
 };
 
@@ -27,6 +28,7 @@ const emptyForm: FormState = {
   body: '',
   footer: '',
   status: 'DRAFT',
+  headerType: '',
   confirmProviderApproved: false,
 };
 
@@ -81,6 +83,7 @@ export function TemplateManager({
       body: template.body,
       footer: template.footer || '',
       status: template.status === 'APPROVED' ? 'APPROVED' : 'DRAFT',
+      headerType: template.headerType || '',
       confirmProviderApproved: template.status === 'APPROVED',
     });
     setError('');
@@ -99,6 +102,7 @@ export function TemplateManager({
         body: form.body,
         footer: form.footer,
         status: form.status,
+        headerType: form.headerType || null,
         confirmProviderApproved: form.status === 'APPROVED' ? form.confirmProviderApproved : false,
       };
 
@@ -206,6 +210,29 @@ export function TemplateManager({
               </label>
             </div>
 
+
+            <div className="template-form-row two">
+              <label>
+                <span>Header Media</span>
+                <select
+                  value={form.headerType}
+                  onChange={(e) => setForm((prev) => ({
+                    ...prev,
+                    headerType: e.target.value as '' | 'IMAGE' | 'VIDEO',
+                  }))}
+                >
+                  <option value="">No media header</option>
+                  <option value="IMAGE">Image header</option>
+                  <option value="VIDEO">Video header</option>
+                </select>
+              </label>
+              <div className="template-media-help">
+                {form.headerType
+                  ? `This template requires a ${form.headerType.toLowerCase()} upload each time you send a campaign.`
+                  : 'Use this only if the approved OfficialWA template has an image or video header.'}
+              </div>
+            </div>
+
             <label>
               <span>Exact Approved Body</span>
               <textarea
@@ -260,7 +287,7 @@ export function TemplateManager({
                     <div className="template-library-title">
                       <div>
                         <b>{template.name}</b>
-                        <small>{template.language} · {template.category}</small>
+                        <small>{template.language} · {template.category}{template.headerType ? ` · ${template.headerType}` : ''}</small>
                       </div>
                       <span className={`pill ${template.status === 'APPROVED' ? 'ok' : template.status === 'DISABLED' ? 'muted' : 'pending-pill'}`}>
                         {template.status}
