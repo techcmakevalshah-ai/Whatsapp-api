@@ -4,19 +4,10 @@ import { fetchSheetContacts } from '../server/googleSheets.js';
 import { listTemplates, sendTemplateMessage } from '../server/whatsapp.js';
 import { supabaseAdmin } from '../server/supabaseAdmin.js';
 
-const TOKEN_HASH = '88b5ccea5f8472a9d061ba7866b0e099dcb08fac07736cf5866f77e9847cf0cf';
 const TEST_CAMPAIGN_NAME = '__officialwa_one_time_test_20260922__';
-
-function validToken(value: string) {
-  const actual = crypto.createHash('sha256').update(value).digest('hex');
-  return actual === TOKEN_HASH;
-}
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
-  const token = String(req.query.token || '');
-  if (!validToken(token)) return res.status(403).json({ error: 'Forbidden' });
-
   try {
     const sb = supabaseAdmin();
 
