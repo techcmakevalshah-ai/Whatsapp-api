@@ -61,7 +61,7 @@ export default function App() {
       const data = await getContacts();
       setContacts(data.contacts);
       setSyncedAt(data.syncedAt);
-      const eligibleIds = new Set(data.contacts.filter((contact) => contact.optIn && contact.status === 'Active').map((contact) => contact.id));
+      const eligibleIds = new Set(data.contacts.filter((contact) => contact.status === 'Active').map((contact) => contact.id));
       setSelected((previous) => new Set([...previous].filter((id) => eligibleIds.has(id))));
     } catch (err) {
       setContactError(err instanceof Error ? err.message : 'Unable to load contacts.');
@@ -118,7 +118,7 @@ export default function App() {
   const send = async () => {
     if (!campaignName.trim()) return setError('Enter a campaign name.');
     if (!template) return setError('Choose an approved WhatsApp template.');
-    if (!chosenContacts.length) return setError('Select at least one active, opted-in contact.');
+    if (!chosenContacts.length) return setError('Select at least one active contact.');
     if (template.variables > 0 && Array.from({ length: template.variables }, (_, i) => variables[String(i + 1)]).some((value) => !value?.trim())) {
       return setError('Fill every required template variable. You can use {{name}}, {{phone}} or {{category}}.');
     }
