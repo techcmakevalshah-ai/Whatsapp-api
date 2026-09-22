@@ -1,6 +1,9 @@
 import { createClient } from '@supabase/supabase-js';
 
-const url = import.meta.env.VITE_SUPABASE_URL;
-const key = import.meta.env.VITE_SUPABASE_ANON_KEY;
+const fallbackUrl = 'https://hdpvabvizwiawonpvzlb.supabase.co';
+const fallbackPublishableKey = 'sb_publishable_3jtMFXgr41bcGW1x1WZQqw_YVLi2a_I';
 
-export const supabase = url && key ? createClient(url, key) : null;
+const url = import.meta.env.VITE_SUPABASE_URL || fallbackUrl;
+const key = import.meta.env.VITE_SUPABASE_ANON_KEY || fallbackPublishableKey;
+
+export const supabase = createClient(url, key);
