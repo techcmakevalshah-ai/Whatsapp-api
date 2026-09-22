@@ -158,47 +158,53 @@ export async function addSheetContact(input: {
   return { id: stableContactId(name, phone), name, phone, category, status } satisfies SheetContact;
 }
 
-export async function deleteSheetContact(contactId: string) {
+function columnLetter(index: number) {
+  let value = index + 1;
+  let output = '';
+  while (value > 0) {
+    const remainder = (value - 1) % 26;
+    output = String.fromCharCode(65 + remainder) + output;
+    value = Math.floor((value - 1) / 26);
+  }
+  return output;
+}
+
+export async function setSheetContactStatus(
+  contactId: string,
+  status: 'Active' | 'Inactive',
+) {
   const data = await readRows();
   const offset = data.looksLikeHeader ? 1 : 0;
   const dataRows = data.looksLikeHeader ? data.rows.slice(1) : data.rows;
 
   let rowIndex = -1;
+  let contact: SheetContact | null = null;
+
   for (let index = 0; index < dataRows.length; index += 1) {
-    const contact = rowToContact(dataRows[index], data);
-    if (contact?.id === contactId) {
+    const parsed = rowToContact(dataRows[index], data);
+    if (parsed?.id === contactId) {
       rowIndex = index + offset;
+      contact = parsed;
       break;
     }
   }
 
-  if (rowIndex < 0) throw new Error('Contact no longer exists in the Google Sheet.');
+  if (rowIndex < 0 || !contact) {
+    throw new Error('Contact no longer exists in the Google Sheet.');
+  }
 
   const { spreadsheetId, range } = config();
   const sheetName = range.split('!')[0] || 'Sheet1';
   const sheets = client();
+  const rowNumber = rowIndex + 1;
+  const statusCell = `${sheetName}!${columnLetter(data.statusIndex)}${rowNumber}`;
 
-  const metadata = await sheets.spreadsheets.get({
+  await sheets.spreadsheets.values.update({
     spreadsheetId,
-    fields: 'sheets.properties(sheetId,title)',
+    range: statusCell,
+    valueInputOption: 'USER_ENTERED',
+    requestBody: { values: [[status]] },
   });
-  const target = metadata.data.sheets?.find((sheet) => sheet.properties?.title === sheetName);
-  const sheetId = target?.properties?.sheetId;
-  if (sheetId === undefined || sheetId === null) throw new Error('Google Sheet tab was not found.');
 
-  await sheets.spreadsheets.batchUpdate({
-    spreadsheetId,
-    requestBody: {
-      requests: [{
-        deleteDimension: {
-          range: {
-            sheetId,
-            dimension: 'ROWS',
-            startIndex: rowIndex,
-            endIndex: rowIndex + 1,
-          },
-        },
-      }],
-    },
-  });
+  return { ...contact, status };
 }
