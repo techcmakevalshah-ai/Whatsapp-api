@@ -1,7 +1,7 @@
 import { Link2 } from 'lucide-react';
 import type { WhatsAppTemplate } from '../types';
 
-export function TemplatePanel({ templates, selectedId, onSelect, variableValues, onVariableChange, mediaUrl, onMediaUrlChange, loading }: {
+export function TemplatePanel({ templates, selectedId, onSelect, variableValues, onVariableChange, mediaUrl, onMediaUrlChange, loading, error }: {
   templates: WhatsAppTemplate[];
   selectedId: string;
   onSelect: (v: string) => void;
@@ -10,6 +10,7 @@ export function TemplatePanel({ templates, selectedId, onSelect, variableValues,
   mediaUrl: string;
   onMediaUrlChange: (value: string) => void;
   loading: boolean;
+  error?: string;
 }) {
   const selected = templates.find((template) => template.id === selectedId);
   const mediaHeader = selected?.headerType && ['IMAGE', 'VIDEO', 'DOCUMENT'].includes(selected.headerType);
@@ -17,6 +18,7 @@ export function TemplatePanel({ templates, selectedId, onSelect, variableValues,
   return (
     <section className="card soft-orange">
       <div className="section-title orange-text"><span className="step orange">3</span> Select WhatsApp Template</div>
+      {error && <div className="inline-error">{error}</div>}
       <div className="template-grid">
         <div>
           <div className="row gap">
