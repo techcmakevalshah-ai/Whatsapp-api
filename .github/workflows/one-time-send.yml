@@ -1,0 +1,15 @@
+name: One Time WhatsApp Send
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  send:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send one test message through production app
+        run: |
+          set -e
+          curl --fail --show-error --silent https://whatsapp-sigma-lac.vercel.app/api/one-time-test-send
+          echo
