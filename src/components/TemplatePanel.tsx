@@ -1,5 +1,11 @@
-import { Link2 } from 'lucide-react';
+import { CheckCircle2, Link2, Upload } from 'lucide-react';
+import { useState, type ChangeEvent } from 'react';
+import { supabase } from '../lib/supabase';
 import type { WhatsAppTemplate } from '../types';
+
+function safeFileName(value: string) {
+  return value.toLowerCase().replace(/[^a-z0-9._-]+/g, '-');
+}
 
 export function TemplatePanel({ templates, selectedId, onSelect, variableValues, onVariableChange, mediaUrl, onMediaUrlChange, loading, error }: {
   templates: WhatsAppTemplate[];
@@ -12,8 +18,58 @@ export function TemplatePanel({ templates, selectedId, onSelect, variableValues,
   loading: boolean;
   error?: string;
 }) {
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState('');
+  const [uploadedName, setUploadedName] = useState('');
   const selected = templates.find((template) => template.id === selectedId);
-  const mediaHeader = selected?.headerType && ['IMAGE', 'VIDEO', 'DOCUMENT'].includes(selected.headerType);
+  const mediaHeader = selected?.headerType && ['IMAGE', 'VIDEO'].includes(selected.headerType);
+
+  const uploadMedia = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file || !selected?.headerType) return;
+
+    setUploadError('');
+    setUploading(true);
+
+    try {
+      const expectedImage = selected.headerType === 'IMAGE';
+      if (expectedImage && !file.type.startsWith('image/')) {
+        throw new Error('This template requires an image file.');
+      }
+      if (!expectedImage && !file.type.startsWith('video/')) {
+        throw new Error('This template requires a video file.');
+      }
+      if (file.size > 16 * 1024 * 1024) {
+        throw new Error('File is too large. Maximum upload size is 16 MB.');
+      }
+
+      const ext = file.name.includes('.') ? file.name.split('.').pop() : '';
+      const base = safeFileName(file.name.replace(/\.[^.]+$/, '')) || 'media';
+      const path = `${selected.name}/${Date.now()}-${crypto.randomUUID()}-${base}${ext ? `.${ext}` : ''}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('whatsapp-template-media')
+        .upload(path, file, { cacheControl: '3600', upsert: false, contentType: file.type });
+
+      if (uploadError) throw uploadError;
+
+      const { data } = supabase.storage
+        .from('whatsapp-template-media')
+        .getPublicUrl(path);
+
+      if (!data.publicUrl) throw new Error('Unable to create a public media URL.');
+
+      onMediaUrlChange(data.publicUrl);
+      setUploadedName(file.name);
+    } catch (err) {
+      setUploadError(err instanceof Error ? err.message : 'Media upload failed.');
+      onMediaUrlChange('');
+      setUploadedName('');
+    } finally {
+      setUploading(false);
+      event.target.value = '';
+    }
+  };
 
   return (
     <section className="card soft-orange">
@@ -22,7 +78,11 @@ export function TemplatePanel({ templates, selectedId, onSelect, variableValues,
       <div className="template-grid">
         <div>
           <div className="row gap">
-            <select value={selectedId} onChange={(e) => onSelect(e.target.value)} disabled={loading}>
+            <select value={selectedId} onChange={(e) => {
+              onSelect(e.target.value);
+              setUploadError('');
+              setUploadedName('');
+            }} disabled={loading}>
               <option value="">{loading ? 'Loading templates…' : 'Choose approved template'}</option>
               {templates.map((template) => <option key={template.id} value={template.id}>{template.name} · {template.language}</option>)}
             </select>
@@ -45,10 +105,52 @@ export function TemplatePanel({ templates, selectedId, onSelect, variableValues,
           {selected && selected.variables > 0 && <small>Dynamic values: <code>{'{{name}}'}</code>, <code>{'{{phone}}'}</code>, <code>{'{{category}}'}</code>.</small>}
         </div>
       </div>
+
       {mediaHeader && (
-        <div className="media-url-field">
-          <div className="media-label">{selected?.headerType} Header <span>Public HTTPS media URL required</span></div>
-          <div className="search"><Link2 size={16}/><input value={mediaUrl} onChange={(e) => onMediaUrlChange(e.target.value)} placeholder="https://example.com/media-file" /></div>
+        <div className="media-upload-card">
+          <div className="media-label">
+            {selected?.headerType} Header
+            <span>Upload the media approved for this campaign template</span>
+          </div>
+
+          <label className="media-upload-button">
+            <Upload size={18}/>
+            <span>{uploading ? 'Uploading…' : `Upload ${selected?.headerType === 'IMAGE' ? 'Image' : 'Video'}`}</span>
+            <input
+              type="file"
+              hidden
+              disabled={uploading}
+              accept={selected?.headerType === 'IMAGE' ? 'image/jpeg,image/png,image/webp' : 'video/mp4,video/3gpp'}
+              onChange={uploadMedia}
+            />
+          </label>
+
+          {mediaUrl && (
+            <div className="media-upload-success">
+              <CheckCircle2 size={16}/>
+              <div>
+                <b>{uploadedName || 'Media ready'}</b>
+                <small>Uploaded and ready to send.</small>
+              </div>
+            </div>
+          )}
+
+          {uploadError && <div className="inline-error">{uploadError}</div>}
+
+          <details className="media-url-fallback">
+            <summary>Use an existing public media URL instead</summary>
+            <div className="search">
+              <Link2 size={16}/>
+              <input
+                value={mediaUrl}
+                onChange={(e) => {
+                  onMediaUrlChange(e.target.value);
+                  setUploadedName('');
+                }}
+                placeholder="https://example.com/media-file"
+              />
+            </div>
+          </details>
         </div>
       )}
     </section>
