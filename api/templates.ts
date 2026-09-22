@@ -48,6 +48,7 @@ function serialize(row: any) {
     footer: row.footer,
     status: row.status,
     variables: row.variables,
+    headerType: row.header_type || null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -79,6 +80,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         footer: rawFooter,
         status: rawStatus,
         confirmProviderApproved,
+        headerType: rawHeaderType,
       } = req.body || {};
 
       const name = validateName(rawName);
@@ -103,6 +105,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
 
       const variables = detectVariables(body);
+      const headerType = rawHeaderType ? String(rawHeaderType).toUpperCase() : null;
+      if (headerType && !['IMAGE', 'VIDEO'].includes(headerType)) {
+        return res.status(400).json({ error: 'Header type must be Image, Video or None.' });
+      }
 
       const { data, error } = await sb
         .from('whatsapp_templates')
@@ -114,6 +120,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           footer: String(rawFooter || '').trim() || null,
           status,
           variables,
+          header_type: headerType,
           created_by: user.id === 'local-development' ? null : user.id,
           updated_at: new Date().toISOString(),
         })
@@ -140,6 +147,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         footer: rawFooter,
         status: rawStatus,
         confirmProviderApproved,
+        headerType: rawHeaderType,
       } = req.body || {};
 
       const name = validateName(rawName);
@@ -164,6 +172,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
 
       const variables = detectVariables(body);
+      const headerType = rawHeaderType ? String(rawHeaderType).toUpperCase() : null;
+      if (headerType && !['IMAGE', 'VIDEO'].includes(headerType)) {
+        return res.status(400).json({ error: 'Header type must be Image, Video or None.' });
+      }
 
       const { data, error } = await sb
         .from('whatsapp_templates')
@@ -175,6 +187,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           footer: String(rawFooter || '').trim() || null,
           status,
           variables,
+          header_type: headerType,
           updated_at: new Date().toISOString(),
         })
         .eq('id', id)
