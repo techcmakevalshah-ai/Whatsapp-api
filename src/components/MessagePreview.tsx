@@ -14,13 +14,47 @@ function renderBody(body: string, values: Record<string, string>, contact?: Cont
   return text;
 }
 
-export function MessagePreview({ template, values, contact }: { template?: WhatsAppTemplate; values: Record<string,string>; contact?: Contact }) {
+export function MessagePreview({
+  template,
+  values,
+  contact,
+  mediaUrl,
+}: {
+  template?: WhatsAppTemplate;
+  values: Record<string,string>;
+  contact?: Contact;
+  mediaUrl?: string;
+}) {
   return (
     <section className="card soft-blue">
-      <div className="section-title blue-text"><span className="step blue">4</span> Message Preview {contact && <small>for {contact.name}</small>}</div>
+      <div className="section-title blue-text">
+        <span className="step blue">4</span>
+        Message Preview
+        {contact && <small>for {contact.name}</small>}
+      </div>
+
       <div className="wa-bg">
-        <div className="message-bubble">
-          {renderBody(template?.body || '', values, contact).split('\n').map((line, i) => <div key={i}>{line || <br/>}</div>)}
+        <div className="message-bubble preview-bubble">
+          {template?.headerType === 'IMAGE' && mediaUrl && (
+            <img className="preview-media" src={mediaUrl} alt="Uploaded template header" />
+          )}
+
+          {template?.headerType === 'VIDEO' && mediaUrl && (
+            <video className="preview-media" src={mediaUrl} controls preload="metadata" />
+          )}
+
+          {template?.headerType && !mediaUrl && (
+            <div className="preview-media-placeholder">
+              Upload the {template.headerType.toLowerCase()} to preview it here.
+            </div>
+          )}
+
+          <div className="preview-message-text">
+            {renderBody(template?.body || '', values, contact)
+              .split('\n')
+              .map((line, i) => <div key={i}>{line || <br/>}</div>)}
+          </div>
+
           <small>{new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</small>
         </div>
       </div>
