@@ -48,6 +48,7 @@ export type ManagedWhatsAppTemplate = {
   footer?: string | null;
   status: 'DRAFT' | 'APPROVED' | 'SUBMITTED' | 'PENDING' | 'REJECTED' | 'PAUSED' | 'DISABLED' | string;
   variables: number;
+  headerType?: 'IMAGE' | 'VIDEO' | null;
   createdAt: string;
   updatedAt: string;
 };
