@@ -31,6 +31,8 @@ export default function App() {
   const [loadingTemplates, setLoadingTemplates] = useState(false);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState('');
+  const [contactError, setContactError] = useState('');
+  const [templateError, setTemplateError] = useState('');
   const [statusRows, setStatusRows] = useState<RecipientStatus[]>([]);
   const [campaignId, setCampaignId] = useState('');
   const [historyOpen, setHistoryOpen] = useState(false);
@@ -54,7 +56,7 @@ export default function App() {
 
   const refreshContacts = async () => {
     setLoadingContacts(true);
-    setError('');
+    setContactError('');
     try {
       const data = await getContacts();
       setContacts(data.contacts);
@@ -62,7 +64,7 @@ export default function App() {
       const eligibleIds = new Set(data.contacts.filter((contact) => contact.optIn && contact.status === 'Active').map((contact) => contact.id));
       setSelected((previous) => new Set([...previous].filter((id) => eligibleIds.has(id))));
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unable to load contacts.');
+      setContactError(err instanceof Error ? err.message : 'Unable to load contacts.');
     } finally {
       setLoadingContacts(false);
     }
@@ -70,12 +72,12 @@ export default function App() {
 
   const refreshTemplates = async () => {
     setLoadingTemplates(true);
-    setError('');
+    setTemplateError('');
     try {
       const data = await getTemplates();
       setTemplates(data.templates);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unable to load WhatsApp templates.');
+      setTemplateError(err instanceof Error ? err.message : 'Unable to load WhatsApp templates.');
     } finally {
       setLoadingTemplates(false);
     }
@@ -172,18 +174,17 @@ export default function App() {
       <div className="content">
         <div className="page-head"><div><h1>WhatsApp Campaign</h1><p>Live Google Sheets contacts → WhatsApp Official templates → delivery tracking</p></div><button className="btn secondary" onClick={openHistory}><History size={16}/> Campaign History</button></div>
         {error && <div className="alert">{error}</div>}
-        {!supabase && <div className="dev-banner">Supabase client is not configured. This mode is intended only for local development with server auth disabled.</div>}
         <div className="progress">
           {[['1','Select Contacts'],['2','Choose Template'],['3','Compose & Preview'],['4','Send & Track']].map(([step,label], index) => <div key={step} style={{display:'contents'}}><div className={`progress-item ${currentStep === Number(step) ? 'active' : currentStep > Number(step) ? 'complete' : ''}`}><b>{step}</b><span>{label}</span></div>{index < 3 && <div className="line"/>}</div>)}
         </div>
         <div className="dashboard-grid">
           <div className="left-col">
-            <GoogleSheetCard syncedAt={syncedAt} loading={loadingContacts} onRefresh={refreshContacts}/>
+            <GoogleSheetCard syncedAt={syncedAt} loading={loadingContacts} onRefresh={refreshContacts} error={contactError}/>
             <ContactsTable contacts={contacts} selected={selected} onToggle={toggle} onToggleAll={toggleAll} query={query} setQuery={setQuery}/>
             <CampaignSettings name={campaignName} setName={setCampaignName} scheduledAt={scheduledAt} setScheduledAt={setScheduledAt}/>
           </div>
           <div className="right-col">
-            <TemplatePanel templates={templates} selectedId={selectedTemplateId} onSelect={(id) => { setSelectedTemplateId(id); setVariables({}); setMediaUrl(''); setCampaignId(''); setStatusRows([]); }} variableValues={variables} onVariableChange={(index,value) => setVariables((previous) => ({ ...previous, [String(index)]: value }))} mediaUrl={mediaUrl} onMediaUrlChange={setMediaUrl} loading={loadingTemplates}/>
+            <TemplatePanel templates={templates} selectedId={selectedTemplateId} onSelect={(id) => { setSelectedTemplateId(id); setVariables({}); setMediaUrl(''); setCampaignId(''); setStatusRows([]); }} variableValues={variables} onVariableChange={(index,value) => setVariables((previous) => ({ ...previous, [String(index)]: value }))} mediaUrl={mediaUrl} onMediaUrlChange={setMediaUrl} loading={loadingTemplates} error={templateError}/>
             <MessagePreview template={template} values={variables} contact={chosenContacts[0]}/>
             <button className="send-btn" onClick={send} disabled={sending}><Send size={19}/>{sending ? 'Processing…' : scheduledAt ? 'Schedule WhatsApp Campaign' : 'Send WhatsApp Message'}</button>
             <div className="send-meta">Selected contacts: <b>{selected.size}</b> &nbsp;|&nbsp; Template: <b>{template ? `${template.name} · ${template.language}` : '—'}</b></div>
