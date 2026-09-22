@@ -1,0 +1,16 @@
+name: Integration Health
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check production integration health
+        run: |
+          set -e
+          echo "Checking production integration health..."
+          curl --fail --show-error --silent https://whatsapp-sigma-lac.vercel.app/api/integration-health
+          echo
