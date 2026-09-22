@@ -6,7 +6,6 @@ export type SheetContact = {
   name: string;
   phone: string;
   category: string;
-  optIn: boolean;
   status: 'Active' | 'Inactive';
 };
 
@@ -14,7 +13,6 @@ const HEADER_ALIASES = {
   name: ['name', 'full name', 'contact name'],
   phone: ['mobile', 'mobile no', 'mobile number', 'phone', 'phone no', 'phone number', 'whatsapp', 'whatsapp number'],
   category: ['category', 'type', 'segment', 'group'],
-  optIn: ['opt-in', 'opt in', 'optin', 'whatsapp opt-in', 'whatsapp opt in', 'consent'],
   status: ['status', 'active', 'contact status'],
 } as const;
 
@@ -27,10 +25,6 @@ function normalizePhone(value: unknown) {
   if (!digits) return '';
   const defaultCountryCode = (process.env.DEFAULT_COUNTRY_CODE || '91').replace(/\D/g, '');
   return digits.length === 10 && defaultCountryCode ? `${defaultCountryCode}${digits}` : digits;
-}
-
-function boolish(value: unknown) {
-  return ['yes', 'true', '1', 'opted in', 'opt-in', 'active', 'allowed'].includes(normalizeHeader(value));
 }
 
 function columnIndex(headers: string[], aliases: readonly string[], fallback: number) {
@@ -72,7 +66,6 @@ export async function fetchSheetContacts(): Promise<SheetContact[]> {
   const nameIndex = columnIndex(headers, HEADER_ALIASES.name, 0);
   const phoneIndex = columnIndex(headers, HEADER_ALIASES.phone, 1);
   const categoryIndex = columnIndex(headers, HEADER_ALIASES.category, 2);
-  const optInIndex = columnIndex(headers, HEADER_ALIASES.optIn, 4);
   const statusIndex = columnIndex(headers, HEADER_ALIASES.status, 5);
 
   const dataRows = looksLikeHeader ? rows.slice(1) : rows;
@@ -81,13 +74,12 @@ export async function fetchSheetContacts(): Promise<SheetContact[]> {
       const name = String(row?.[nameIndex] ?? '').trim();
       const phone = normalizePhone(row?.[phoneIndex]);
       const category = String(row?.[categoryIndex] ?? 'Contact').trim() || 'Contact';
-      const optIn = boolish(row?.[optInIndex]);
       const statusValue = normalizeHeader(row?.[statusIndex] || 'active');
       const status: 'Active' | 'Inactive' = ['inactive', 'no', 'disabled', 'blocked'].includes(statusValue)
         ? 'Inactive'
         : 'Active';
       if (!name || !phone) return null;
-      return { id: stableContactId(name, phone), name, phone, category, optIn, status } satisfies SheetContact;
+      return { id: stableContactId(name, phone), name, phone, category, status } satisfies SheetContact;
     })
     .filter((contact): contact is SheetContact => Boolean(contact));
 }
