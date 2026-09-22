@@ -11,6 +11,7 @@ import { CampaignStatus } from './components/CampaignStatus';
 import { CampaignHistory } from './components/CampaignHistory';
 import { Login } from './components/Login';
 import { TemplateManager } from './components/TemplateManager';
+import { TestMessageDialog } from './components/TestMessageDialog';
 import { getCampaigns, getCampaignStatus, getContacts, getTemplates, sendCampaign } from './lib/api';
 import { supabase } from './lib/supabase';
 import type { CampaignSummary, Contact, RecipientStatus, WhatsAppTemplate } from './types';
@@ -41,6 +42,7 @@ export default function App() {
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyError, setHistoryError] = useState('');
   const [templateManagerOpen, setTemplateManagerOpen] = useState(false);
+  const [testMessageOpen, setTestMessageOpen] = useState(false);
 
   const chosenContacts = useMemo(() => contacts.filter((contact) => selected.has(contact.id)), [contacts, selected]);
   const template = templates.find((item) => item.id === selectedTemplateId);
@@ -187,8 +189,20 @@ export default function App() {
           </div>
           <div className="right-col">
             <TemplatePanel templates={templates} selectedId={selectedTemplateId} onSelect={(id) => { setSelectedTemplateId(id); setVariables({}); setMediaUrl(''); setCampaignId(''); setStatusRows([]); }} variableValues={variables} onVariableChange={(index,value) => setVariables((previous) => ({ ...previous, [String(index)]: value }))} mediaUrl={mediaUrl} onMediaUrlChange={setMediaUrl} loading={loadingTemplates} error={templateError}/>
-            <MessagePreview template={template} values={variables} contact={chosenContacts[0]}/>
-            <button className="send-btn" onClick={send} disabled={sending}><Send size={19}/>{sending ? 'Processing…' : scheduledAt ? 'Schedule WhatsApp Campaign' : 'Send WhatsApp Message'}</button>
+            <MessagePreview template={template} values={variables} contact={chosenContacts[0]} mediaUrl={mediaUrl}/>
+            <div className="campaign-action-row">
+              <button
+                className="btn test-send-btn"
+                onClick={() => setTestMessageOpen(true)}
+                disabled={!template}
+              >
+                <Send size={17}/> Send Test Message
+              </button>
+              <button className="send-btn campaign-send-btn" onClick={send} disabled={sending}>
+                <Send size={19}/>
+                {sending ? 'Processing…' : scheduledAt ? 'Schedule WhatsApp Campaign' : 'Send WhatsApp Message'}
+              </button>
+            </div>
             <div className="send-meta">Selected contacts: <b>{selected.size}</b> &nbsp;|&nbsp; Template: <b>{template ? `${template.name} · ${template.language}` : '—'}</b></div>
           </div>
         </div>
@@ -200,6 +214,13 @@ export default function App() {
       open={templateManagerOpen}
       onClose={() => setTemplateManagerOpen(false)}
       onChanged={refreshTemplates}
+    />
+    <TestMessageDialog
+      open={testMessageOpen}
+      template={template}
+      variableValues={variables}
+      mediaUrl={mediaUrl}
+      onClose={() => setTestMessageOpen(false)}
     />
   </div>;
 }
