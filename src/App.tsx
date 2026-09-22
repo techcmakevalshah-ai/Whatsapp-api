@@ -13,7 +13,7 @@ import { CampaignHistory } from './components/CampaignHistory';
 import { Login } from './components/Login';
 import { TemplateManager } from './components/TemplateManager';
 import { TestMessageDialog } from './components/TestMessageDialog';
-import { getCampaigns, getCampaignStatus, getContacts, getTemplates, sendCampaign } from './lib/api';
+import { cancelCampaign, getCampaigns, getCampaignStatus, getContacts, getTemplates, rescheduleCampaign, sendCampaign } from './lib/api';
 import { supabase } from './lib/supabase';
 import type { CampaignSummary, Contact, RecipientStatus, WhatsAppTemplate } from './types';
 
@@ -162,6 +162,7 @@ export default function App() {
         variableValues: variables,
         mediaUrl: mediaUrl.trim() || undefined,
         scheduledAt: scheduledAt ? new Date(scheduledAt).toISOString() : undefined,
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
       });
       setCampaignId(data.campaignId);
       setStatusRows(data.recipients);
@@ -184,6 +185,22 @@ export default function App() {
     } finally {
       setHistoryLoading(false);
     }
+  };
+
+  const cancelScheduledCampaign = async (campaign: CampaignSummary) => {
+    await cancelCampaign(campaign.id);
+    const data = await getCampaigns();
+    setCampaigns(data.campaigns);
+  };
+
+  const rescheduleScheduledCampaign = async (
+    campaign: CampaignSummary,
+    nextScheduledAt: string,
+    timezone: string,
+  ) => {
+    await rescheduleCampaign(campaign.id, nextScheduledAt, timezone);
+    const data = await getCampaigns();
+    setCampaigns(data.campaigns);
   };
 
   if (!authReady) return <div className="app-loading">Loading…</div>;
@@ -340,6 +357,8 @@ export default function App() {
         loading={historyLoading}
         error={historyError}
         onClose={() => setHistoryOpen(false)}
+        onCancel={cancelScheduledCampaign}
+        onReschedule={rescheduleScheduledCampaign}
       />
       <TemplateManager
         open={templateManagerOpen}
