@@ -35,6 +35,7 @@ export function sendCampaign(payload: {
   contactIds: string[];
   variableValues: Record<string, string>;
   scheduledAt?: string;
+  timezone?: string;
   mediaUrl?: string;
 }): Promise<{ campaignId: string; recipients: RecipientStatus[]; eligibleCount: number }> {
   return json('/api/whatsapp/send', { method: 'POST', body: JSON.stringify(payload) });
@@ -114,5 +115,23 @@ export function setContactStatus(
   return json(`/api/contacts?id=${encodeURIComponent(id)}`, {
     method: 'PATCH',
     body: JSON.stringify({ status }),
+  });
+}
+
+export function cancelCampaign(id: string): Promise<{ ok: true; status: string; canceledAt: string }> {
+  return json(`/api/campaigns?id=${encodeURIComponent(id)}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ action: 'cancel' }),
+  });
+}
+
+export function rescheduleCampaign(
+  id: string,
+  scheduledAt: string,
+  timezone: string,
+): Promise<{ ok: true; status: string; scheduledAt: string; timezone: string }> {
+  return json(`/api/campaigns?id=${encodeURIComponent(id)}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ action: 'reschedule', scheduledAt, timezone }),
   });
 }
