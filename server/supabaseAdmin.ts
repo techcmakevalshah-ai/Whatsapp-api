@@ -1,8 +1,16 @@
 import { createClient } from '@supabase/supabase-js';
 
+const PROJECT_URL = 'https://hdpvabvizwiawonpvzlb.supabase.co';
+
 export function supabaseAdmin() {
-  const url = process.env.SUPABASE_URL;
+  const url = process.env.SUPABASE_URL || PROJECT_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !key) throw new Error('Supabase server environment variables are missing.');
-  return createClient(url, key, { auth: { persistSession: false } });
+
+  if (!key) {
+    throw new Error('SUPABASE_SERVICE_ROLE_KEY is missing in Vercel environment variables.');
+  }
+
+  return createClient(url, key, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
 }
