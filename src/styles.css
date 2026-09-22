@@ -73,3 +73,34 @@
 .test-note code{background:#e9eef5;color:#334155;padding:2px 5px;border-radius:4px}
 .test-success{background:#effaf2;border:1px solid #ccebd4;color:#176b37;padding:10px 12px;border-radius:8px;margin-bottom:12px}
 @media(max-width:700px){.campaign-action-row{grid-template-columns:1fr}}
+
+.nav-button{width:100%;border:0;text-align:left;background:transparent;color:inherit;cursor:pointer;font:inherit}
+.nav-button:hover{background:#132842;color:#fff}
+.nav-disabled{opacity:.55;cursor:default}
+.contacts-page{display:flex;flex-direction:column;gap:16px}
+.contacts-page-head{display:flex;justify-content:space-between;align-items:flex-start;gap:14px}
+.contacts-page-head h1{margin:0 0 4px;color:#0b1830;font-size:28px}
+.contacts-page-head p{margin:0;color:#60708a;font-size:13px}
+.contact-add-card{padding:16px}
+.contact-title-icon{width:26px;height:26px;border-radius:7px;background:#dcfce7;color:#15803d;display:grid;place-items:center}
+.contact-add-form{display:grid;grid-template-columns:1.15fr 1.15fr 1fr .8fr auto;gap:10px;align-items:end}
+.contact-add-form label{display:flex;flex-direction:column;gap:6px;color:#475569;font-size:11px;font-weight:750}
+.contact-add-form input,.contact-add-form select{width:100%;border:1px solid #dbe3ec;background:#fff;border-radius:8px;padding:10px 11px;font:inherit;outline:none;color:#0f172a}
+.contact-add-form input:focus,.contact-add-form select:focus{border-color:#16a34a;box-shadow:0 0 0 3px rgba(22,163,74,.09)}
+.contact-add-button{background:#16a34a;color:#fff;padding:11px 14px;justify-content:center;white-space:nowrap}
+.contacts-full-card{padding:0;overflow:hidden}
+.contacts-list-toolbar{padding:15px 16px;display:flex;justify-content:space-between;align-items:center;gap:14px;border-bottom:1px solid #e5eaf1}
+.contacts-list-toolbar>div:first-child{display:flex;flex-direction:column;gap:3px}
+.contacts-list-toolbar small{color:#7a8799}
+.contacts-list-title{margin:0}
+.contacts-search{max-width:390px}
+.contacts-full-table{border:0;border-radius:0}
+.contacts-full-table th,.contacts-full-table td{padding:12px 14px}
+.contact-actions-column{text-align:right}
+.contacts-full-table td:last-child{text-align:right}
+.contact-delete-button{border:1px solid #fecaca;background:#fff;color:#b42318;border-radius:7px;padding:7px 9px;display:inline-flex;align-items:center;gap:6px;cursor:pointer;font-weight:700;font-size:11px}
+.contact-delete-button:hover{background:#fff1f0}
+.contact-delete-button:disabled{opacity:.55;cursor:not-allowed}
+.contacts-empty{padding:36px;text-align:center;color:#718096}
+@media(max-width:1100px){.contact-add-form{grid-template-columns:1fr 1fr}.contact-add-button{grid-column:1/-1}}
+@media(max-width:700px){.contacts-page-head,.contacts-list-toolbar{flex-direction:column;align-items:stretch}.contacts-search{max-width:none}.contact-add-form{grid-template-columns:1fr}.contact-add-button{grid-column:auto}}
