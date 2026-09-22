@@ -40,3 +40,13 @@
 .pending-pill{background:#fff4cc;color:#8a5a00}
 @media(max-width:900px){.template-manager-grid{grid-template-columns:1fr}.template-form{position:static}}
 @media(max-width:600px){.template-manager{width:100vw;padding:16px}.template-form-row.two{grid-template-columns:1fr}}
+
+.template-media-help{display:flex;align-items:center;padding:10px 11px;border:1px dashed #d6dde8;border-radius:8px;background:#fff;color:#64748b;font-size:11px;line-height:1.45}
+.media-upload-card{margin-top:12px;border:1px solid #f1d8c7;background:#fff;border-radius:9px;padding:12px}
+.media-upload-button{display:inline-flex;align-items:center;gap:8px;border:1px solid #d9e1eb;background:#f8fafc;color:#1f4fbf;border-radius:8px;padding:10px 12px;font-size:12px;font-weight:750;cursor:pointer}
+.media-upload-button:hover{background:#f1f5f9}
+.media-upload-success{display:flex;align-items:center;gap:9px;margin-top:10px;padding:9px 10px;background:#effaf2;border:1px solid #ccebd4;border-radius:8px;color:#16733a}
+.media-upload-success>div{display:flex;flex-direction:column;gap:2px}
+.media-upload-success small{color:#5c7664}
+.media-url-fallback{margin-top:10px}
+.media-url-fallback summary{cursor:pointer;color:#6b7280;font-size:11px;margin-bottom:8px}
