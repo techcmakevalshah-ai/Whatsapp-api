@@ -87,3 +87,13 @@ export function updateManagedTemplate(id: string, payload: {
 export function disableManagedTemplate(id: string): Promise<{ ok: true }> {
   return json(`/api/templates?id=${encodeURIComponent(id)}`, { method: 'DELETE' });
 }
+
+export function sendTestMessage(payload: {
+  phone: string;
+  templateName: string;
+  templateLanguage: string;
+  variableValues: Record<string, string>;
+  mediaUrl?: string;
+}): Promise<{ ok: true; messageId?: string | null; phoneLast4: string }> {
+  return json('/api/whatsapp/test', { method: 'POST', body: JSON.stringify(payload) });
+}
