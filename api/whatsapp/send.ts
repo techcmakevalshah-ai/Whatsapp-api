@@ -47,10 +47,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const liveContacts = await fetchSheetContacts();
     const requestedIds = new Set(contactIds.map(String));
     const selectedContacts = liveContacts.filter(
-      (contact) => requestedIds.has(contact.id) && contact.optIn && contact.status === 'Active',
+      (contact) => requestedIds.has(contact.id) && contact.status === 'Active',
     );
     if (!selectedContacts.length) {
-      return res.status(400).json({ error: 'None of the selected contacts are currently active and opted in.' });
+      return res.status(400).json({ error: 'None of the selected contacts are currently active.' });
     }
     if (selectedContacts.length !== requestedIds.size) {
       return res.status(400).json({
