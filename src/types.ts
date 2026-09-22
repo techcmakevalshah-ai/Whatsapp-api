@@ -21,7 +21,7 @@ export type RecipientStatus = {
   id: string;
   name: string;
   phone: string;
-  status: 'Queued' | 'Processing' | 'Sent' | 'Delivered' | 'Read' | 'Failed';
+  status: 'Queued' | 'Processing' | 'Sent' | 'Delivered' | 'Read' | 'Failed' | 'Cancelled';
   sentAt?: string | null;
   deliveredAt?: string | null;
   readAt?: string | null;
@@ -34,6 +34,9 @@ export type CampaignSummary = {
   templateName: string;
   status: string;
   scheduledAt?: string | null;
+  timezone?: string | null;
+  canceledAt?: string | null;
+  schedulerError?: string | null;
   createdAt: string;
   totalRecipients: number;
 };
