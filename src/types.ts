@@ -55,3 +55,19 @@ export type ManagedWhatsAppTemplate = {
   createdAt: string;
   updatedAt: string;
 };
+
+export type RecurringCampaignSummary = {
+  id: string;
+  name: string;
+  templateName: string;
+  status: 'active' | 'paused' | 'completed' | 'canceled' | string;
+  timezone: string;
+  startAt: string;
+  nextRunAt?: string | null;
+  totalDays: number;
+  runsCreated: number;
+  lastRunAt?: string | null;
+  schedulerError?: string | null;
+  createdAt: string;
+  totalRecipients: number;
+};
