@@ -16,7 +16,7 @@ function graphBase() {
   return `https://graph.facebook.com/${version}`;
 }
 
-function authHeaders() {
+function metaAuthHeaders() {
   const token = process.env.WHATSAPP_ACCESS_TOKEN;
   if (!token) throw new Error('WHATSAPP_ACCESS_TOKEN is missing.');
   return { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
@@ -27,15 +27,110 @@ function countVariables(body: string) {
   return new Set(matches.map((value) => value.replace(/\D/g, ''))).size;
 }
 
+function parseOfficialWaTemplates(): Template[] {
+  const raw = process.env.OFFICIALWA_TEMPLATES_JSON;
+  if (!raw) {
+    const name = process.env.OFFICIALWA_TEMPLATE_NAME;
+    if (!name) {
+      throw new Error(
+        'OfficialWA template catalog is not configured. Set OFFICIALWA_TEMPLATES_JSON or OFFICIALWA_TEMPLATE_NAME in Vercel.',
+      );
+    }
+    const language = process.env.OFFICIALWA_TEMPLATE_LANGUAGE || 'en';
+    const variables = Number(process.env.OFFICIALWA_TEMPLATE_VARIABLES || '0');
+    const body =
+      process.env.OFFICIALWA_TEMPLATE_BODY ||
+      [
+        `Template: ${name}`,
+        ...Array.from({ length: Number.isFinite(variables) ? variables : 0 }, (_, i) => `{{${i + 1}}}`),
+      ].join('\n');
+
+    return [{
+      id: `officialwa:${name}:${language}`,
+      name,
+      language,
+      status: 'APPROVED',
+      body,
+      variables: Number.isFinite(variables) ? Math.max(0, variables) : 0,
+      headerType: null,
+    }];
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    throw new Error('OFFICIALWA_TEMPLATES_JSON is not valid JSON.');
+  }
+
+  if (!Array.isArray(parsed)) {
+    throw new Error('OFFICIALWA_TEMPLATES_JSON must be a JSON array.');
+  }
+
+  return parsed.map((item: any, index) => {
+    const name = String(item?.name || '').trim();
+    if (!name) throw new Error(`OfficialWA template at index ${index} is missing a name.`);
+
+    const language = String(item?.language || 'en').trim() || 'en';
+    const variables = Number(item?.variables ?? countVariables(String(item?.body || '')));
+    return {
+      id: String(item?.id || `officialwa:${name}:${language}`),
+      name,
+      language,
+      status: String(item?.status || 'APPROVED').toUpperCase(),
+      category: item?.category ? String(item.category) : undefined,
+      body:
+        String(item?.body || '').trim() ||
+        [
+          `Template: ${name}`,
+          ...Array.from({ length: Number.isFinite(variables) ? variables : 0 }, (_, i) => `{{${i + 1}}}`),
+        ].join('\n'),
+      variables: Number.isFinite(variables) ? Math.max(0, variables) : 0,
+      headerType: item?.headerType || null,
+    } satisfies Template;
+  });
+}
+
+function officialWaReceiver(phone: string) {
+  const digits = phone.replace(/\D/g, '');
+  const mode = (process.env.OFFICIALWA_RECEIVER_MODE || 'e164').toLowerCase();
+
+  if (mode === 'local10') return digits.slice(-10);
+  return digits;
+}
+
+function officialWaEndpoint() {
+  const base = (process.env.OFFICIALWA_BASE_URL || 'https://crm.officialwa.com/api/meta/v19.0').replace(/\/$/, '');
+  const senderId = process.env.OFFICIALWA_SENDER_ID;
+  if (!senderId) throw new Error('OFFICIALWA_SENDER_ID is missing in Vercel environment variables.');
+  return `${base}/${encodeURIComponent(senderId)}/messages`;
+}
+
+function officialWaHeaders() {
+  const token = process.env.OFFICIALWA_ACCESS_TOKEN;
+  if (!token) throw new Error('OFFICIALWA_ACCESS_TOKEN is missing in Vercel environment variables.');
+  return {
+    Authorization: `Bearer ${token}`,
+    'Content-Type': 'application/json',
+  };
+}
+
 export async function listTemplates(): Promise<Template[]> {
-  const provider = process.env.WHATSAPP_PROVIDER || 'meta';
-  if (provider !== 'meta') throw new Error('Custom provider template adapter is not configured yet.');
+  const provider = (process.env.WHATSAPP_PROVIDER || 'officialwa').toLowerCase();
+
+  if (provider === 'officialwa') {
+    return parseOfficialWaTemplates().filter((template) => template.status === 'APPROVED');
+  }
+
+  if (provider !== 'meta') {
+    throw new Error(`Unsupported WhatsApp provider: ${provider}`);
+  }
 
   const wabaId = process.env.WHATSAPP_WABA_ID;
   if (!wabaId) throw new Error('WHATSAPP_WABA_ID is missing.');
 
   const url = `${graphBase()}/${wabaId}/message_templates?status=APPROVED&limit=100`;
-  const response = await fetch(url, { headers: authHeaders() });
+  const response = await fetch(url, { headers: metaAuthHeaders() });
   const json: any = await response.json();
   if (!response.ok) throw new Error(json?.error?.message || 'Unable to load WhatsApp templates.');
 
@@ -69,20 +164,63 @@ export async function sendTemplateMessage(input: {
   headerType?: HeaderType;
   mediaUrl?: string | null;
 }) {
-  const provider = process.env.WHATSAPP_PROVIDER || 'meta';
+  const provider = (process.env.WHATSAPP_PROVIDER || 'officialwa').toLowerCase();
 
-  if (provider === 'custom') {
-    const url = process.env.WHATSAPP_CUSTOM_API_URL;
-    const token = process.env.WHATSAPP_CUSTOM_API_TOKEN;
-    if (!url || !token) throw new Error('Custom WhatsApp provider URL/token is missing.');
-    const response = await fetch(url, {
+  if (provider === 'officialwa') {
+    if (input.headerType && ['IMAGE', 'VIDEO', 'DOCUMENT'].includes(input.headerType)) {
+      throw new Error('OfficialWA media-header templates are not enabled yet. Share the provider media-template API example first.');
+    }
+
+    const payload = {
+      to: officialWaReceiver(input.phone),
+      recipient_type: 'individual',
+      type: 'template',
+      template: {
+        language: {
+          policy: 'deterministic',
+          code: input.language || 'en',
+        },
+        name: input.templateName,
+        components: input.params.length
+          ? [{
+              type: 'body',
+              parameters: input.params.map((text) => ({
+                type: 'text',
+                text,
+              })),
+            }]
+          : [],
+      },
+    };
+
+    const response = await fetch(officialWaEndpoint(), {
       method: 'POST',
-      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify(input),
+      headers: officialWaHeaders(),
+      body: JSON.stringify(payload),
     });
+
     const json: any = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(json?.error || json?.message || 'Custom provider send failed.');
-    return { messageId: json.messageId || json.id || '' };
+    if (!response.ok) {
+      throw new Error(
+        json?.error?.message ||
+        json?.message ||
+        json?.error ||
+        `OfficialWA send failed with HTTP ${response.status}.`,
+      );
+    }
+
+    return {
+      messageId:
+        json?.messages?.[0]?.id ||
+        json?.data?.messages?.[0]?.id ||
+        json?.message_id ||
+        json?.id ||
+        '',
+    };
+  }
+
+  if (provider !== 'meta') {
+    throw new Error(`Unsupported WhatsApp provider: ${provider}`);
   }
 
   const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
@@ -103,7 +241,7 @@ export async function sendTemplateMessage(input: {
 
   const response = await fetch(`${graphBase()}/${phoneNumberId}/messages`, {
     method: 'POST',
-    headers: authHeaders(),
+    headers: metaAuthHeaders(),
     body: JSON.stringify({
       messaging_product: 'whatsapp',
       to: input.phone.replace(/\D/g, ''),
