@@ -3,7 +3,6 @@ export type Contact = {
   name: string;
   phone: string;
   category: string;
-  optIn: boolean;
   status: 'Active' | 'Inactive';
 };
 
