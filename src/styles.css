@@ -111,3 +111,33 @@
 .contact-status-button.activate{border:1px solid #bbf7d0;color:#166534}
 .contact-status-button.activate:hover{background:#f0fdf4}
 .contact-status-button:disabled{opacity:.55;cursor:not-allowed}
+
+.campaign-settings-card{overflow:hidden}
+.campaign-settings-grid{align-items:end}
+.schedule-mode-field{display:flex;flex-direction:column;gap:7px}
+.schedule-field-label{font-size:12px;font-weight:650;color:#334155}
+.schedule-mode-toggle{display:grid;grid-template-columns:1fr 1fr;border:1px solid #dce3ec;border-radius:8px;overflow:hidden;background:#fff}
+.schedule-mode-toggle button{border:0;background:#fff;color:#64748b;padding:10px 12px;display:flex;align-items:center;justify-content:center;gap:7px;font-weight:700;cursor:pointer}
+.schedule-mode-toggle button+button{border-left:1px solid #e5eaf1}
+.schedule-mode-toggle button.active{background:#6734cc;color:#fff}
+.schedule-panel{margin-top:14px;border:1px solid #eadff7;background:#fff;border-radius:10px;padding:13px}
+.schedule-input-row{display:grid;grid-template-columns:1fr auto;gap:12px;align-items:end}
+.schedule-input-row label{display:flex;flex-direction:column;gap:7px;font-size:12px;font-weight:650;color:#334155}
+.schedule-input-row input{border:1px solid #dce3ec;border-radius:8px;padding:10px 11px;font:inherit;outline:none}
+.schedule-timezone{display:flex;gap:8px;align-items:center;border:1px solid #e5e7eb;background:#f8fafc;border-radius:8px;padding:9px 11px;min-width:190px}
+.schedule-timezone>div{display:flex;flex-direction:column}.schedule-timezone b{font-size:11px}.schedule-timezone small{font-size:10px;color:#7b8798}
+.schedule-quick-actions{display:flex;gap:7px;align-items:center;flex-wrap:wrap;margin-top:10px;font-size:11px;color:#64748b}
+.schedule-quick-actions button{border:1px solid #dbe3ec;background:#fff;border-radius:999px;padding:6px 9px;cursor:pointer;color:#4c1d95;font-weight:650}
+.schedule-quick-actions button:hover{background:#f5f3ff}
+.schedule-note{margin-top:10px;padding:9px 10px;background:#faf7ff;border:1px solid #ede9fe;border-radius:7px;color:#6b5b81;font-size:10px}
+.history-modal-wide{width:min(1120px,97vw)}
+.campaign-history-table table{min-width:980px}
+.campaign-history-actions{display:flex;gap:6px}
+.schedule-history-button{border:1px solid #c7d2fe;background:#eef2ff;color:#3730a3;padding:6px 8px;font-size:10px}
+.cancel-history-button{border:1px solid #fecaca;background:#fff1f0;color:#b42318;padding:6px 8px;font-size:10px}
+.reschedule-inline{display:flex;align-items:center;gap:5px}
+.reschedule-inline input{border:1px solid #dbe3ec;border-radius:6px;padding:6px;font-size:10px}
+.schedule-save-button{color:#15803d}
+.campaign-timezone,.campaign-scheduler-error{display:block;margin-top:3px;font-size:9px;color:#7a8799;white-space:normal}
+.campaign-scheduler-error{color:#b42318;max-width:220px}
+@media(max-width:700px){.schedule-input-row{grid-template-columns:1fr}.schedule-timezone{min-width:0}.schedule-mode-toggle{grid-template-columns:1fr}}
