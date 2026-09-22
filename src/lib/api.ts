@@ -1,22 +1,19 @@
 import { supabase } from './supabase';
 import type { CampaignSummary, Contact, RecipientStatus, WhatsAppTemplate } from '../types';
 
-async function authHeaders() {
-  if (!supabase) return {};
-  const { data } = await supabase.auth.getSession();
-  const token = data.session?.access_token;
-  return token ? { Authorization: `Bearer ${token}` } : {};
-}
-
 async function json<T>(url: string, init?: RequestInit): Promise<T> {
-  const auth = await authHeaders();
+  const headers = new Headers(init?.headers);
+  if (!headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
+
+  if (supabase) {
+    const { data } = await supabase.auth.getSession();
+    const token = data.session?.access_token;
+    if (token) headers.set('Authorization', `Bearer ${token}`);
+  }
+
   const res = await fetch(url, {
     ...init,
-    headers: {
-      'Content-Type': 'application/json',
-      ...auth,
-      ...(init?.headers || {}),
-    },
+    headers,
   });
   const body = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(body.error || `Request failed (${res.status})`);
