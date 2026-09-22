@@ -1,31 +1,31 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import crypto from 'node:crypto';
 import { processCampaignBatch } from '../../server/campaignWorker.js';
 import { supabaseAdmin } from '../../server/supabaseAdmin.js';
 
 const CAMPAIGN_LIMIT = 5;
 const BATCH_SIZE = 20;
 
-function authorized(req: VercelRequest) {
-  const expected = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
-  const header = String(req.headers.authorization || '');
-  const received = header.startsWith('Bearer ') ? header.slice(7).trim() : '';
+async function authorized(req: VercelRequest) {
+  const candidate = String(req.headers['x-scheduler-token'] || '').trim();
+  if (!candidate) return false;
 
-  if (!expected || !received) return false;
-
-  const a = Buffer.from(expected);
-  const b = Buffer.from(received);
-  return a.length === b.length && crypto.timingSafeEqual(a, b);
+  const sb = supabaseAdmin();
+  const { data, error } = await sb.rpc('scheduler_token_matches', { candidate });
+  if (error) throw error;
+  return data === true;
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
-  if (!authorized(req)) return res.status(401).json({ error: 'Unauthorized scheduler request.' });
-
-  const sb = supabaseAdmin();
-  const now = new Date().toISOString();
 
   try {
+    if (!(await authorized(req))) {
+      return res.status(401).json({ error: 'Unauthorized scheduler request.' });
+    }
+
+    const sb = supabaseAdmin();
+    const now = new Date().toISOString();
+
     const { data: campaigns, error } = await sb
       .from('campaigns')
       .select('id, name, status, scheduled_at')
