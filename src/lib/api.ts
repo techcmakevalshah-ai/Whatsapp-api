@@ -107,6 +107,12 @@ export function addContact(payload: {
   return json('/api/contacts', { method: 'POST', body: JSON.stringify(payload) });
 }
 
-export function deleteContact(id: string): Promise<{ ok: true; contacts: Contact[]; syncedAt: string }> {
-  return json(`/api/contacts?id=${encodeURIComponent(id)}`, { method: 'DELETE' });
+export function setContactStatus(
+  id: string,
+  status: 'Active' | 'Inactive',
+): Promise<{ contact: Contact; contacts: Contact[]; syncedAt: string }> {
+  return json(`/api/contacts?id=${encodeURIComponent(id)}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ status }),
+  });
 }
