@@ -10,6 +10,7 @@ import { CampaignSettings } from './components/CampaignSettings';
 import { CampaignStatus } from './components/CampaignStatus';
 import { CampaignHistory } from './components/CampaignHistory';
 import { Login } from './components/Login';
+import { TemplateManager } from './components/TemplateManager';
 import { getCampaigns, getCampaignStatus, getContacts, getTemplates, sendCampaign } from './lib/api';
 import { supabase } from './lib/supabase';
 import type { CampaignSummary, Contact, RecipientStatus, WhatsAppTemplate } from './types';
@@ -39,6 +40,7 @@ export default function App() {
   const [campaigns, setCampaigns] = useState<CampaignSummary[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyError, setHistoryError] = useState('');
+  const [templateManagerOpen, setTemplateManagerOpen] = useState(false);
 
   const chosenContacts = useMemo(() => contacts.filter((contact) => selected.has(contact.id)), [contacts, selected]);
   const template = templates.find((item) => item.id === selectedTemplateId);
@@ -165,7 +167,7 @@ export default function App() {
   if (supabase && !session) return <Login />;
 
   return <div className="app-shell">
-    <Sidebar onHistory={openHistory} />
+    <Sidebar onHistory={openHistory} onTemplates={() => setTemplateManagerOpen(true)} />
     <main className="main">
       <header className="topbar">
         <div><span>Campaigns</span><b>›</b><span>New Campaign</span></div>
@@ -194,5 +196,10 @@ export default function App() {
       </div>
     </main>
     <CampaignHistory open={historyOpen} campaigns={campaigns} loading={historyLoading} error={historyError} onClose={() => setHistoryOpen(false)} />
+    <TemplateManager
+      open={templateManagerOpen}
+      onClose={() => setTemplateManagerOpen(false)}
+      onChanged={refreshTemplates}
+    />
   </div>;
 }
