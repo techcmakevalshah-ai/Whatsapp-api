@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { requireStaff } from '../server/auth.js';
-import { addSheetContact, deleteSheetContact, fetchSheetContacts } from '../server/googleSheets.js';
+import { addSheetContact, fetchSheetContacts, setSheetContactStatus } from '../server/googleSheets.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const user = await requireStaff(req, res);
@@ -30,17 +30,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       });
     }
 
-    if (req.method === 'DELETE') {
-      const id = String(req.query.id || '');
+    if (req.method === 'PATCH') {
+      const id = String(req.query.id || req.body?.id || '');
       if (!id) return res.status(400).json({ error: 'Contact id is required.' });
 
-      await deleteSheetContact(id);
+      const status = req.body?.status === 'Inactive' ? 'Inactive' : 'Active';
+      const contact = await setSheetContactStatus(id, status);
       const contacts = await fetchSheetContacts();
 
       return res.status(200).json({
-        ok: true,
+        contact,
         contacts,
         syncedAt: new Date().toISOString(),
+      });
+    }
+
+    if (req.method === 'DELETE') {
+      return res.status(405).json({
+        error: 'Permanent contact deletion is disabled for security. Set the contact to Inactive instead.',
       });
     }
 
@@ -53,7 +60,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     return res.status(permissionProblem ? 403 : 500).json({
       error: permissionProblem
-        ? 'Google Sheet write access is blocked. Change the service account permission on the Sheet from Viewer to Editor.'
+        ? 'Google Sheet write access is blocked for the server service account.'
         : message,
     });
   }
