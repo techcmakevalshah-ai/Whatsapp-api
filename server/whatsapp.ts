@@ -108,7 +108,7 @@ async function loadOfficialWaTemplates(): Promise<Template[]> {
   try {
     const { data, error } = await supabaseAdmin()
       .from('whatsapp_templates')
-      .select('id, provider_template_id, name, language, category, body, status, variables')
+      .select('id, provider_template_id, name, language, category, body, status, variables, header_type')
       .eq('status', 'APPROVED')
       .order('name', { ascending: true });
 
@@ -123,7 +123,7 @@ async function loadOfficialWaTemplates(): Promise<Template[]> {
         category: row.category || undefined,
         body: row.body || '',
         variables: Number(row.variables || 0),
-        headerType: null,
+        headerType: row.header_type || null,
       }));
     }
   } catch (error) {
@@ -212,8 +212,30 @@ export async function sendTemplateMessage(input: {
   const provider = (process.env.WHATSAPP_PROVIDER || 'officialwa').toLowerCase();
 
   if (provider === 'officialwa') {
-    if (input.headerType && ['IMAGE', 'VIDEO', 'DOCUMENT'].includes(input.headerType)) {
-      throw new Error('OfficialWA media-header templates are not enabled yet. Share the provider media-template API example first.');
+    const components: any[] = [];
+
+    if (input.headerType && ['IMAGE', 'VIDEO'].includes(input.headerType)) {
+      if (!input.mediaUrl) {
+        throw new Error(`${input.headerType.toLowerCase()} template requires an uploaded media file.`);
+      }
+      const type = input.headerType.toLowerCase();
+      components.push({
+        type: 'header',
+        parameters: [{
+          type,
+          [type]: { link: input.mediaUrl },
+        }],
+      });
+    }
+
+    if (input.params.length) {
+      components.push({
+        type: 'body',
+        parameters: input.params.map((text) => ({
+          type: 'text',
+          text,
+        })),
+      });
     }
 
     const payload = {
@@ -226,15 +248,7 @@ export async function sendTemplateMessage(input: {
           code: input.language || 'en',
         },
         name: input.templateName,
-        components: input.params.length
-          ? [{
-              type: 'body',
-              parameters: input.params.map((text) => ({
-                type: 'text',
-                text,
-              })),
-            }]
-          : [],
+        components,
       },
     };
 
