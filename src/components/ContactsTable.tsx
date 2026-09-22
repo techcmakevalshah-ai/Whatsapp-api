@@ -1,4 +1,4 @@
-import { Search } from 'lucide-react';
+import { Filter, Search } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import type { Contact } from '../types';
 
@@ -12,31 +12,47 @@ export function ContactsTable({ contacts, selected, onToggle, onToggleAll, query
   query: string;
   setQuery: (v: string) => void;
 }) {
-  const [filter, setFilter] = useState<FilterMode>('all');
+  const [statusFilter, setStatusFilter] = useState<FilterMode>('all');
+  const [categoryFilter, setCategoryFilter] = useState('all');
+
+  const categories = useMemo(
+    () => [...new Set(contacts.map((contact) => contact.category).filter(Boolean))]
+      .sort((a, b) => a.localeCompare(b)),
+    [contacts],
+  );
 
   const filtered = useMemo(() => contacts.filter((contact) => {
     const matchesQuery = `${contact.name} ${contact.phone} ${contact.category}`
       .toLowerCase()
       .includes(query.toLowerCase());
 
-    const matchesFilter =
-      filter === 'all'
-      || (filter === 'active' && contact.status === 'Active')
-      || (filter === 'inactive' && contact.status === 'Inactive');
+    const matchesStatus =
+      statusFilter === 'all'
+      || (statusFilter === 'active' && contact.status === 'Active')
+      || (statusFilter === 'inactive' && contact.status === 'Inactive');
 
-    return matchesQuery && matchesFilter;
-  }), [contacts, query, filter]);
+    const matchesCategory =
+      categoryFilter === 'all' || contact.category === categoryFilter;
+
+    return matchesQuery && matchesStatus && matchesCategory;
+  }), [contacts, query, statusFilter, categoryFilter]);
 
   const activeVisible = filtered.filter((contact) => contact.status === 'Active');
   const allVisibleSelected =
     activeVisible.length > 0 &&
     activeVisible.every((contact) => selected.has(contact.id));
 
+  const clearFilters = () => {
+    setQuery('');
+    setStatusFilter('all');
+    setCategoryFilter('all');
+  };
+
   return (
     <section className="card contacts-card">
       <div className="section-title"><span className="step blue">2</span> Contacts from Google Sheet</div>
 
-      <div className="toolbar">
+      <div className="toolbar contact-filter-toolbar">
         <div className="search">
           <Search size={17}/>
           <input
@@ -48,13 +64,28 @@ export function ContactsTable({ contacts, selected, onToggle, onToggleAll, query
 
         <select
           className="filter-select"
-          value={filter}
-          onChange={(e) => setFilter(e.target.value as FilterMode)}
+          value={categoryFilter}
+          onChange={(e) => setCategoryFilter(e.target.value)}
         >
-          <option value="all">All contacts</option>
+          <option value="all">All categories</option>
+          {categories.map((category) => (
+            <option key={category} value={category}>{category}</option>
+          ))}
+        </select>
+
+        <select
+          className="filter-select"
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value as FilterMode)}
+        >
+          <option value="all">All status</option>
           <option value="active">Active only</option>
           <option value="inactive">Inactive</option>
         </select>
+
+        <button className="btn contact-clear-filter" type="button" onClick={clearFilters}>
+          <Filter size={14}/> Clear
+        </button>
       </div>
 
       <div className="table-wrap">
@@ -96,13 +127,18 @@ export function ContactsTable({ contacts, selected, onToggle, onToggleAll, query
                 </td>
               </tr>
             ))}
+            {!filtered.length && (
+              <tr>
+                <td colSpan={5}><div className="contacts-empty">No contacts match these filters.</div></td>
+              </tr>
+            )}
           </tbody>
         </table>
       </div>
 
       <div className="table-summary">
         <b>{selected.size}</b> selected · {filtered.length} shown · {contacts.length} total
-        <span>Only inactive contacts are blocked.</span>
+        <span>Select All applies only to filtered active contacts.</span>
       </div>
     </section>
   );
