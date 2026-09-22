@@ -23,6 +23,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       contactIds,
       variableValues,
       scheduledAt,
+      timezone,
       mediaUrl,
     } = req.body || {};
 
@@ -62,7 +63,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (scheduleDate && Number.isNaN(scheduleDate.getTime())) {
       return res.status(400).json({ error: 'Invalid campaign schedule.' });
     }
-    const shouldQueue = Boolean(scheduleDate && scheduleDate.getTime() > Date.now() + 30_000);
+
+    const timezoneValue = String(timezone || 'UTC').trim() || 'UTC';
+    try {
+      new Intl.DateTimeFormat('en-US', { timeZone: timezoneValue }).format(new Date());
+    } catch {
+      return res.status(400).json({ error: 'Invalid timezone.' });
+    }
+
+    if (scheduleDate && scheduleDate.getTime() <= Date.now() + 60_000) {
+      return res.status(400).json({ error: 'Scheduled time must be at least 1 minute in the future.' });
+    }
+
+    if (scheduleDate && scheduleDate.getTime() > Date.now() + 366 * 24 * 60 * 60 * 1000) {
+      return res.status(400).json({ error: 'Scheduled time cannot be more than 1 year in the future.' });
+    }
+
+    const shouldQueue = Boolean(scheduleDate);
 
     const campaignId = crypto.randomUUID();
     const sb = supabaseAdmin();
@@ -75,6 +92,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       media_url: String(mediaUrl || '').trim() || null,
       status: shouldQueue ? 'scheduled' : 'sending',
       scheduled_at: shouldQueue ? scheduleDate!.toISOString() : new Date().toISOString(),
+      timezone: timezoneValue,
+      scheduler_error: null,
       created_by: user.id === 'local-development' ? null : user.id,
     });
     if (campaignError) throw campaignError;
