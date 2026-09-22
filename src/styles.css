@@ -141,3 +141,25 @@
 .campaign-timezone,.campaign-scheduler-error{display:block;margin-top:3px;font-size:9px;color:#7a8799;white-space:normal}
 .campaign-scheduler-error{color:#b42318;max-width:220px}
 @media(max-width:700px){.schedule-input-row{grid-template-columns:1fr}.schedule-timezone{min-width:0}.schedule-mode-toggle{grid-template-columns:1fr}}
+
+.contact-filter-toolbar{align-items:center;flex-wrap:wrap}
+.contact-clear-filter{background:#f8fafc;border:1px solid #dbe3ec;color:#64748b;white-space:nowrap}
+.contacts-manager-filters{display:flex;align-items:center;gap:8px;flex:1;justify-content:flex-end}
+.contacts-manager-filters .contacts-search{min-width:260px}
+.schedule-mode-three{grid-template-columns:1fr 1fr 1fr}
+.recurrence-days-field{min-width:135px}
+.recurrence-days-field input{width:100%;border:1px solid #dce3ec!important;background:#fff!important;border-radius:8px!important;padding:10px 11px!important}
+.recurrence-summary{display:flex;align-items:center;gap:10px;margin-top:11px;padding:11px 12px;border:1px solid #d8ccf1;background:#f8f5ff;border-radius:8px;color:#5b21b6}
+.recurrence-summary>div{display:flex;flex-direction:column;gap:2px}
+.recurrence-summary b{font-size:12px}
+.recurrence-summary span{font-size:10px;color:#77638f}
+.history-section-title{font-size:13px;font-weight:800;color:#172033;margin:4px 0 9px}
+.one-time-title{margin-top:22px}
+.recurring-history-table table{min-width:940px}
+.compact-empty{padding:24px 18px}
+@media(max-width:900px){
+  .contacts-manager-filters{width:100%;justify-content:stretch;flex-wrap:wrap}
+  .contacts-manager-filters .contacts-search{min-width:100%}
+  .schedule-mode-three{grid-template-columns:1fr}
+  .schedule-mode-toggle button+button{border-left:0;border-top:1px solid #e5eaf1}
+}
