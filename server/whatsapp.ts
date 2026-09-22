@@ -1,3 +1,4 @@
+import { supabaseAdmin } from './supabaseAdmin.js';
 type HeaderType = 'IMAGE' | 'VIDEO' | 'DOCUMENT' | 'TEXT' | null;
 
 type Template = {
@@ -102,6 +103,39 @@ function parseOfficialWaTemplates(): Template[] {
   });
 }
 
+
+async function loadOfficialWaTemplates(): Promise<Template[]> {
+  try {
+    const { data, error } = await supabaseAdmin()
+      .from('whatsapp_templates')
+      .select('id, provider_template_id, name, language, category, body, status, variables')
+      .eq('status', 'APPROVED')
+      .order('name', { ascending: true });
+
+    if (error) throw error;
+
+    if (data?.length) {
+      return data.map((row: any) => ({
+        id: row.id,
+        name: row.name,
+        language: row.language || 'en',
+        status: row.status,
+        category: row.category || undefined,
+        body: row.body || '',
+        variables: Number(row.variables || 0),
+        headerType: null,
+      }));
+    }
+  } catch (error) {
+    console.warn(
+      'Unable to load OfficialWA templates from Supabase, using environment fallback:',
+      error instanceof Error ? error.message : error,
+    );
+  }
+
+  return parseOfficialWaTemplates().filter((template) => template.status === 'APPROVED');
+}
+
 function officialWaReceiver(phone: string) {
   const digits = phone.replace(/\D/g, '');
   const mode = (process.env.OFFICIALWA_RECEIVER_MODE || 'e164').toLowerCase();
@@ -130,7 +164,7 @@ export async function listTemplates(): Promise<Template[]> {
   const provider = (process.env.WHATSAPP_PROVIDER || 'officialwa').toLowerCase();
 
   if (provider === 'officialwa') {
-    return parseOfficialWaTemplates().filter((template) => template.status === 'APPROVED');
+    return loadOfficialWaTemplates();
   }
 
   if (provider !== 'meta') {
