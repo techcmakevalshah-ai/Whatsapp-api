@@ -1,5 +1,5 @@
 import { supabase } from './supabase';
-import type { CampaignSummary, Contact, ManagedWhatsAppTemplate, RecipientStatus, WhatsAppTemplate } from '../types';
+import type { CampaignSummary, Contact, ManagedWhatsAppTemplate, RecipientStatus, RecurringCampaignSummary, WhatsAppTemplate } from '../types';
 
 async function json<T>(url: string, init?: RequestInit): Promise<T> {
   const headers = new Headers(init?.headers);
@@ -36,8 +36,17 @@ export function sendCampaign(payload: {
   variableValues: Record<string, string>;
   scheduledAt?: string;
   timezone?: string;
+  recurrenceDays?: number;
   mediaUrl?: string;
-}): Promise<{ campaignId: string; recipients: RecipientStatus[]; eligibleCount: number }> {
+}): Promise<{
+  campaignId?: string;
+  recurring?: boolean;
+  recurringSeriesId?: string;
+  totalDays?: number;
+  nextRunAt?: string;
+  recipients: RecipientStatus[];
+  eligibleCount: number;
+}> {
   return json('/api/whatsapp/send', { method: 'POST', body: JSON.stringify(payload) });
 }
 
@@ -133,5 +142,19 @@ export function rescheduleCampaign(
   return json(`/api/campaigns?id=${encodeURIComponent(id)}`, {
     method: 'PATCH',
     body: JSON.stringify({ action: 'reschedule', scheduledAt, timezone }),
+  });
+}
+
+export function getRecurringCampaigns(): Promise<{ recurringCampaigns: RecurringCampaignSummary[] }> {
+  return json('/api/recurring-campaigns');
+}
+
+export function updateRecurringCampaign(
+  id: string,
+  action: 'pause' | 'resume' | 'cancel',
+): Promise<{ ok: true; status: string; nextRunAt?: string }> {
+  return json(`/api/recurring-campaigns?id=${encodeURIComponent(id)}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ action }),
   });
 }
