@@ -49,7 +49,7 @@ export async function processCampaignBatch(campaignId: string, limit = 20) {
         .from('campaign_recipients')
         .update({
           status: 'Sent',
-          provider_message_id: sent.messageId,
+          provider_message_id: sent.messageId || null,
           sent_at: sentAt,
           error_message: null,
         })
@@ -57,7 +57,12 @@ export async function processCampaignBatch(campaignId: string, limit = 20) {
       if (error) throw error;
       results.push({ id: row.id, name: row.name, phone: row.phone, status: 'Sent', sentAt });
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Send failed';
+      const message =
+        error instanceof Error
+          ? error.message
+          : typeof error === 'object' && error && 'message' in error
+            ? String((error as any).message)
+            : 'Send failed';
       await sb
         .from('campaign_recipients')
         .update({ status: 'Failed', error_message: message })
