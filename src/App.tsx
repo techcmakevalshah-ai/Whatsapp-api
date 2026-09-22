@@ -167,7 +167,7 @@ export default function App() {
     <main className="main">
       <header className="topbar">
         <div><span>Campaigns</span><b>›</b><span>New Campaign</span></div>
-        <div className="user"><Bell size={18}/><span className="avatar">KS</span><b>{session?.user.email || 'Local Staff'}</b><ChevronDown size={15}/>{supabase && <button className="icon-btn" title="Sign out" onClick={() => supabase.auth.signOut()}><LogOut size={17}/></button>}</div>
+        <div className="user"><Bell size={18}/><span className="avatar">KS</span><b>{session?.user.email || 'Local Staff'}</b><ChevronDown size={15}/>{supabase && <button className="icon-btn" title="Sign out" onClick={() => void supabase?.auth.signOut()}><LogOut size={17}/></button>}</div>
       </header>
       <div className="content">
         <div className="page-head"><div><h1>WhatsApp Campaign</h1><p>Live Google Sheets contacts → WhatsApp Official templates → delivery tracking</p></div><button className="btn secondary" onClick={openHistory}><History size={16}/> Campaign History</button></div>
