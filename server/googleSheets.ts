@@ -12,7 +12,7 @@ export type SheetContact = {
 
 const HEADER_ALIASES = {
   name: ['name', 'full name', 'contact name'],
-  phone: ['mobile', 'mobile number', 'phone', 'phone number', 'whatsapp', 'whatsapp number'],
+  phone: ['mobile', 'mobile no', 'mobile number', 'phone', 'phone no', 'phone number', 'whatsapp', 'whatsapp number'],
   category: ['category', 'type', 'segment', 'group'],
   optIn: ['opt-in', 'opt in', 'optin', 'whatsapp opt-in', 'whatsapp opt in', 'consent'],
   status: ['status', 'active', 'contact status'],
@@ -44,8 +44,8 @@ function stableContactId(name: string, phone: string) {
 }
 
 export async function fetchSheetContacts(): Promise<SheetContact[]> {
-  const sheetId = process.env.GOOGLE_SHEET_ID;
-  const range = process.env.GOOGLE_SHEET_RANGE || 'Contacts!A:Z';
+  const sheetId = process.env.GOOGLE_SHEET_ID || '1snnfuibfwKlTREsanssDV6yzxGsWzPUzg3X5Qk8kVaE';
+  const range = process.env.GOOGLE_SHEET_RANGE || 'Sheet1!A:Z';
   const email = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
   const privateKey = process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY?.replace(/\\n/g, '\n');
 
