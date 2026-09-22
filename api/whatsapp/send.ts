@@ -24,6 +24,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       variableValues,
       scheduledAt,
       timezone,
+      recurrenceDays,
       mediaUrl,
     } = req.body || {};
 
@@ -79,10 +80,81 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(400).json({ error: 'Scheduled time cannot be more than 1 year in the future.' });
     }
 
+    const recurringDays = recurrenceDays === undefined || recurrenceDays === null || recurrenceDays === ''
+      ? null
+      : Number(recurrenceDays);
+
+    if (recurringDays !== null && (!Number.isInteger(recurringDays) || recurringDays < 1 || recurringDays > 90)) {
+      return res.status(400).json({ error: 'Daily recurrence must be between 1 and 90 days.' });
+    }
+
+    if (recurringDays !== null && !scheduleDate) {
+      return res.status(400).json({ error: 'A start date and time is required for a daily recurring campaign.' });
+    }
+
     const shouldQueue = Boolean(scheduleDate);
+    const sb = supabaseAdmin();
+
+    if (recurringDays !== null) {
+      // Validate dynamic variables against the current selected contacts before saving the series.
+      selectedContacts.forEach((contact) => {
+        resolveVariableMap(variableValues || {}, contact, template.variables);
+      });
+
+      const seriesId = crypto.randomUUID();
+      const { error: seriesError } = await sb.from('recurring_campaigns').insert({
+        id: seriesId,
+        name: String(name).trim().slice(0, 120),
+        template_name: template.name,
+        template_language: template.language,
+        header_type: template.headerType || null,
+        media_url: String(mediaUrl || '').trim() || null,
+        variable_values: variableValues || {},
+        timezone: timezoneValue,
+        start_at: scheduleDate!.toISOString(),
+        next_run_at: scheduleDate!.toISOString(),
+        total_days: recurringDays,
+        runs_created: 0,
+        status: 'active',
+        created_by: user.id === 'local-development' ? null : user.id,
+      });
+
+      if (seriesError) throw seriesError;
+
+      const recurringRecipients = selectedContacts.map((contact) => ({
+        id: crypto.randomUUID(),
+        recurring_campaign_id: seriesId,
+        phone: contact.phone,
+        initial_name: contact.name,
+        initial_category: contact.category,
+      }));
+
+      const { error: recurringRecipientsError } = await sb
+        .from('recurring_campaign_recipients')
+        .insert(recurringRecipients);
+
+      if (recurringRecipientsError) throw recurringRecipientsError;
+
+      return res.status(200).json({
+        recurring: true,
+        recurringSeriesId: seriesId,
+        eligibleCount: selectedContacts.length,
+        totalDays: recurringDays,
+        nextRunAt: scheduleDate!.toISOString(),
+        recipients: selectedContacts.map((contact) => ({
+          id: contact.id,
+          name: contact.name,
+          phone: contact.phone,
+          status: 'Queued',
+          sentAt: null,
+          deliveredAt: null,
+          readAt: null,
+          error: null,
+        })),
+      });
+    }
 
     const campaignId = crypto.randomUUID();
-    const sb = supabaseAdmin();
     const { error: campaignError } = await sb.from('campaigns').insert({
       id: campaignId,
       name: String(name).trim().slice(0, 120),
