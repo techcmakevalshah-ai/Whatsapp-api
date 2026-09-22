@@ -14,3 +14,29 @@
 .inline-error{margin:10px 0 0;padding:9px 10px;border-radius:7px;background:#fff1f0;border:1px solid #fecaca;color:#b42318;font-size:12px}
 .status-dot-off{background:#cbd5e1;box-shadow:0 0 0 4px #f1f5f9}
 .disconnected{font-size:12px;color:#64748b}
+
+.template-manager{height:100%;width:min(1180px,96vw);background:#fff;padding:24px;box-shadow:-20px 0 60px rgba(15,23,42,.18);overflow:auto}
+.template-notice{padding:11px 12px;border:1px solid #f5cf76;background:#fff9e9;border-radius:8px;color:#77500a;font-size:12px;line-height:1.45;margin-bottom:16px}
+.template-manager-grid{display:grid;grid-template-columns:minmax(0,.9fr) minmax(0,1.1fr);gap:18px;align-items:start}
+.template-form{border:1px solid #dfe6ef;background:#fbfcfe;border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:13px;position:sticky;top:0}
+.template-form-head,.template-library-head,.template-library-title,.template-library-actions{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.template-form-head h3,.template-library-head h3{margin:0;color:#0b1830}
+.template-form-head small,.template-library-head span,.template-library-title small,.template-library-meta{color:#718096;font-size:11px}
+.template-form-row{display:grid;gap:12px}.template-form-row.two{grid-template-columns:1fr 1fr}
+.template-form label{display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:700;color:#334155}
+.template-form input,.template-form textarea,.template-form select{width:100%;border:1px solid #dbe3ec;border-radius:8px;background:#fff;padding:10px 11px;font:inherit;color:#0f172a;outline:none}
+.template-form textarea{resize:vertical;line-height:1.5}
+.template-form input:focus,.template-form textarea:focus,.template-form select:focus{border-color:#16a34a;box-shadow:0 0 0 3px rgba(22,163,74,.09)}
+.approval-confirm{flex-direction:row!important;align-items:flex-start!important;background:#effaf2;border:1px solid #ccebd4;border-radius:8px;padding:10px}
+.approval-confirm input{width:auto;margin-top:2px}
+.template-library{display:flex;flex-direction:column;gap:12px}
+.template-library-list{display:flex;flex-direction:column;gap:10px}
+.template-library-item{border:1px solid #dfe6ef;border-radius:10px;padding:13px;background:#fff}
+.template-library-title>div{display:flex;flex-direction:column;gap:3px}
+.template-library-body{white-space:pre-wrap;background:#f8fafc;border:1px solid #e8edf3;border-radius:7px;padding:10px;margin:10px 0;font-size:12px;line-height:1.5;max-height:150px;overflow:auto}
+.template-library-meta{margin-bottom:10px}
+.template-library-actions{justify-content:flex-end}
+.btn.danger-outline{background:#fff;border:1px solid #fecaca;color:#b42318}
+.pending-pill{background:#fff4cc;color:#8a5a00}
+@media(max-width:900px){.template-manager-grid{grid-template-columns:1fr}.template-form{position:static}}
+@media(max-width:600px){.template-manager{width:100vw;padding:16px}.template-form-row.two{grid-template-columns:1fr}}
