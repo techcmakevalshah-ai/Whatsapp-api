@@ -1,6 +1,6 @@
-import { CalendarClock, Save, X, XCircle } from 'lucide-react';
+import { CalendarClock, Pause, Play, Save, X, XCircle } from 'lucide-react';
 import { useState } from 'react';
-import type { CampaignSummary } from '../types';
+import type { CampaignSummary, RecurringCampaignSummary } from '../types';
 
 function toLocalInput(iso?: string | null) {
   if (!iso) return '';
@@ -11,8 +11,8 @@ function toLocalInput(iso?: string | null) {
 }
 
 function statusClass(status: string) {
-  if (status === 'sent') return 'ok';
-  if (status === 'scheduled' || status === 'sending') return 'pending-pill';
+  if (status === 'sent' || status === 'active' || status === 'completed') return 'ok';
+  if (status === 'scheduled' || status === 'sending' || status === 'paused') return 'pending-pill';
   if (status === 'sent_with_errors') return 'bad';
   return 'muted';
 }
@@ -24,19 +24,23 @@ function statusLabel(status: string) {
 export function CampaignHistory({
   open,
   campaigns,
+  recurringCampaigns,
   loading,
   error,
   onClose,
   onCancel,
   onReschedule,
+  onRecurringAction,
 }: {
   open: boolean;
   campaigns: CampaignSummary[];
+  recurringCampaigns: RecurringCampaignSummary[];
   loading: boolean;
   error: string;
   onClose: () => void;
   onCancel: (campaign: CampaignSummary) => Promise<void>;
   onReschedule: (campaign: CampaignSummary, scheduledAt: string, timezone: string) => Promise<void>;
+  onRecurringAction: (campaign: RecurringCampaignSummary, action: 'pause' | 'resume' | 'cancel') => Promise<void>;
 }) {
   const [editingId, setEditingId] = useState('');
   const [rescheduleValue, setRescheduleValue] = useState('');
@@ -82,7 +86,7 @@ export function CampaignHistory({
 
   const cancel = async (campaign: CampaignSummary) => {
     const confirmed = window.confirm(
-      `Cancel "${campaign.name}"? No queued messages from this scheduled campaign will be sent.`,
+      'Cancel "' + campaign.name + '"? No queued messages from this scheduled campaign will be sent.',
     );
     if (!confirmed) return;
 
@@ -101,19 +105,126 @@ export function CampaignHistory({
     }
   };
 
+  const recurringAction = async (
+    campaign: RecurringCampaignSummary,
+    action: 'pause' | 'resume' | 'cancel',
+  ) => {
+    if (action === 'cancel') {
+      const confirmed = window.confirm(
+        'Cancel recurring series "' + campaign.name + '"? Future daily sends will stop.',
+      );
+      if (!confirmed) return;
+    }
+
+    setBusyId(campaign.id);
+    setActionError('');
+    try {
+      await onRecurringAction(campaign, action);
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : 'Unable to update recurring campaign.');
+    } finally {
+      setBusyId('');
+    }
+  };
+
   return (
     <div className="modal-backdrop" onMouseDown={onClose}>
       <section className="history-modal history-modal-wide" onMouseDown={(event) => event.stopPropagation()}>
         <div className="modal-head">
           <div>
-            <h2>Campaign History</h2>
-            <p>Latest 50 campaigns · scheduled campaigns can be changed until sending starts</p>
+            <h2>Campaign History & Schedules</h2>
+            <p>Manage one-time campaigns and recurring daily schedules.</p>
           </div>
           <button className="icon-btn" onClick={onClose}><X size={20}/></button>
         </div>
 
         {(error || actionError) && <div className="alert">{actionError || error}</div>}
 
+        <div className="history-section-title">Recurring Daily Schedules</div>
+        {loading ? (
+          <div className="empty-state">Loading schedules…</div>
+        ) : recurringCampaigns.length ? (
+          <div className="table-wrap recurring-history-table">
+            <table>
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Template</th>
+                  <th>Recipients</th>
+                  <th>Progress</th>
+                  <th>Status</th>
+                  <th>Next Send</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {recurringCampaigns.map((campaign) => (
+                  <tr key={campaign.id}>
+                    <td>
+                      <b>{campaign.name}</b>
+                      {campaign.schedulerError && (
+                        <small className="campaign-scheduler-error">{campaign.schedulerError}</small>
+                      )}
+                    </td>
+                    <td>{campaign.templateName}</td>
+                    <td>{campaign.totalRecipients}</td>
+                    <td>
+                      <b>{campaign.runsCreated}/{campaign.totalDays}</b>
+                      <small className="campaign-timezone">
+                        {campaign.totalDays - campaign.runsCreated} remaining
+                      </small>
+                    </td>
+                    <td>
+                      <span className={'pill ' + statusClass(campaign.status)}>
+                        {statusLabel(campaign.status)}
+                      </span>
+                    </td>
+                    <td>
+                      {campaign.nextRunAt ? new Date(campaign.nextRunAt).toLocaleString() : '—'}
+                      <small className="campaign-timezone">{campaign.timezone}</small>
+                    </td>
+                    <td>
+                      <div className="campaign-history-actions">
+                        {campaign.status === 'active' && (
+                          <button
+                            className="btn schedule-history-button"
+                            disabled={busyId === campaign.id}
+                            onClick={() => void recurringAction(campaign, 'pause')}
+                          >
+                            <Pause size={14}/> Pause
+                          </button>
+                        )}
+                        {campaign.status === 'paused' && (
+                          <button
+                            className="btn schedule-history-button"
+                            disabled={busyId === campaign.id}
+                            onClick={() => void recurringAction(campaign, 'resume')}
+                          >
+                            <Play size={14}/> Resume
+                          </button>
+                        )}
+                        {['active', 'paused'].includes(campaign.status) && (
+                          <button
+                            className="btn cancel-history-button"
+                            disabled={busyId === campaign.id}
+                            onClick={() => void recurringAction(campaign, 'cancel')}
+                          >
+                            <XCircle size={14}/> Cancel
+                          </button>
+                        )}
+                        {!['active', 'paused'].includes(campaign.status) && '—'}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="empty-state compact-empty">No recurring schedules yet.</div>
+        )}
+
+        <div className="history-section-title one-time-title">One-time Campaigns & Daily Send Records</div>
         {loading ? (
           <div className="empty-state">Loading campaigns…</div>
         ) : campaigns.length ? (
@@ -143,7 +254,7 @@ export function CampaignHistory({
                     <td>{campaign.templateName}</td>
                     <td>{campaign.totalRecipients}</td>
                     <td>
-                      <span className={`pill ${statusClass(campaign.status)}`}>
+                      <span className={'pill ' + statusClass(campaign.status)}>
                         {statusLabel(campaign.status)}
                       </span>
                     </td>
@@ -207,7 +318,7 @@ export function CampaignHistory({
             </table>
           </div>
         ) : (
-          <div className="empty-state">No campaigns yet.</div>
+          <div className="empty-state compact-empty">No campaigns yet.</div>
         )}
       </section>
     </div>
