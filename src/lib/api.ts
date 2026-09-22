@@ -62,6 +62,7 @@ export function createManagedTemplate(payload: {
   body: string;
   footer?: string;
   status: 'DRAFT' | 'APPROVED';
+  headerType?: 'IMAGE' | 'VIDEO' | null;
   confirmProviderApproved?: boolean;
 }): Promise<{ template: ManagedWhatsAppTemplate }> {
   return json('/api/templates', { method: 'POST', body: JSON.stringify(payload) });
@@ -74,6 +75,7 @@ export function updateManagedTemplate(id: string, payload: {
   body: string;
   footer?: string;
   status: 'DRAFT' | 'APPROVED';
+  headerType?: 'IMAGE' | 'VIDEO' | null;
   confirmProviderApproved?: boolean;
 }): Promise<{ template: ManagedWhatsAppTemplate }> {
   return json(`/api/templates?id=${encodeURIComponent(id)}`, {
