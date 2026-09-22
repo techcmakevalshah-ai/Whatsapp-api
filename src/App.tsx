@@ -7,15 +7,15 @@ import { ContactsTable } from './components/ContactsTable';
 import { ContactsManager } from './components/ContactsManager';
 import { TemplatePanel } from './components/TemplatePanel';
 import { MessagePreview } from './components/MessagePreview';
-import { CampaignSettings } from './components/CampaignSettings';
+import { CampaignSettings, type DeliveryMode } from './components/CampaignSettings';
 import { CampaignStatus } from './components/CampaignStatus';
 import { CampaignHistory } from './components/CampaignHistory';
 import { Login } from './components/Login';
 import { TemplateManager } from './components/TemplateManager';
 import { TestMessageDialog } from './components/TestMessageDialog';
-import { cancelCampaign, getCampaigns, getCampaignStatus, getContacts, getTemplates, rescheduleCampaign, sendCampaign } from './lib/api';
+import { cancelCampaign, getCampaigns, getCampaignStatus, getContacts, getRecurringCampaigns, getTemplates, rescheduleCampaign, sendCampaign, updateRecurringCampaign } from './lib/api';
 import { supabase } from './lib/supabase';
-import type { CampaignSummary, Contact, RecipientStatus, WhatsAppTemplate } from './types';
+import type { CampaignSummary, Contact, RecipientStatus, RecurringCampaignSummary, WhatsAppTemplate } from './types';
 
 export default function App() {
   const [session, setSession] = useState<Session | null>(null);
@@ -29,6 +29,8 @@ export default function App() {
   const [mediaUrl, setMediaUrl] = useState('');
   const [campaignName, setCampaignName] = useState('');
   const [scheduledAt, setScheduledAt] = useState('');
+  const [deliveryMode, setDeliveryMode] = useState<DeliveryMode>('now');
+  const [recurrenceDays, setRecurrenceDays] = useState(30);
   const [syncedAt, setSyncedAt] = useState('');
   const [query, setQuery] = useState('');
   const [loadingContacts, setLoadingContacts] = useState(false);
@@ -41,6 +43,7 @@ export default function App() {
   const [campaignId, setCampaignId] = useState('');
   const [historyOpen, setHistoryOpen] = useState(false);
   const [campaigns, setCampaigns] = useState<CampaignSummary[]>([]);
+  const [recurringCampaigns, setRecurringCampaigns] = useState<RecurringCampaignSummary[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyError, setHistoryError] = useState('');
   const [templateManagerOpen, setTemplateManagerOpen] = useState(false);
@@ -143,6 +146,12 @@ export default function App() {
     ) {
       return setError('Fill every required template variable. You can use {{name}}, {{phone}} or {{category}}.');
     }
+    if (deliveryMode !== 'now' && !scheduledAt) {
+      return setError('Choose the date and time for this scheduled campaign.');
+    }
+    if (deliveryMode === 'daily' && (recurrenceDays < 1 || recurrenceDays > 90)) {
+      return setError('Daily recurrence must be between 1 and 90 days.');
+    }
     if (
       template.headerType &&
       ['IMAGE', 'VIDEO', 'DOCUMENT'].includes(template.headerType) &&
@@ -161,11 +170,16 @@ export default function App() {
         contactIds: chosenContacts.map((contact) => contact.id),
         variableValues: variables,
         mediaUrl: mediaUrl.trim() || undefined,
-        scheduledAt: scheduledAt ? new Date(scheduledAt).toISOString() : undefined,
+        scheduledAt: deliveryMode !== 'now' && scheduledAt ? new Date(scheduledAt).toISOString() : undefined,
         timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
+        recurrenceDays: deliveryMode === 'daily' ? recurrenceDays : undefined,
       });
-      setCampaignId(data.campaignId);
-      setStatusRows(data.recipients);
+      setCampaignId(data.campaignId || '');
+      setStatusRows(data.recurring ? [] : data.recipients);
+      if (data.recurring) {
+        const recurringData = await getRecurringCampaigns();
+        setRecurringCampaigns(recurringData.recurringCampaigns);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Campaign failed.');
     } finally {
@@ -178,8 +192,12 @@ export default function App() {
     setHistoryLoading(true);
     setHistoryError('');
     try {
-      const data = await getCampaigns();
-      setCampaigns(data.campaigns);
+      const [campaignData, recurringData] = await Promise.all([
+        getCampaigns(),
+        getRecurringCampaigns(),
+      ]);
+      setCampaigns(campaignData.campaigns);
+      setRecurringCampaigns(recurringData.recurringCampaigns);
     } catch (err) {
       setHistoryError(err instanceof Error ? err.message : 'Unable to load campaign history.');
     } finally {
@@ -201,6 +219,15 @@ export default function App() {
     await rescheduleCampaign(campaign.id, nextScheduledAt, timezone);
     const data = await getCampaigns();
     setCampaigns(data.campaigns);
+  };
+
+  const updateRecurringSchedule = async (
+    campaign: RecurringCampaignSummary,
+    action: 'pause' | 'resume' | 'cancel',
+  ) => {
+    await updateRecurringCampaign(campaign.id, action);
+    const data = await getRecurringCampaigns();
+    setRecurringCampaigns(data.recurringCampaigns);
   };
 
   if (!authReady) return <div className="app-loading">Loading…</div>;
@@ -296,6 +323,10 @@ export default function App() {
                     setName={setCampaignName}
                     scheduledAt={scheduledAt}
                     setScheduledAt={setScheduledAt}
+                    deliveryMode={deliveryMode}
+                    setDeliveryMode={setDeliveryMode}
+                    recurrenceDays={recurrenceDays}
+                    setRecurrenceDays={setRecurrenceDays}
                   />
                 </div>
 
@@ -335,7 +366,13 @@ export default function App() {
                     </button>
                     <button className="send-btn campaign-send-btn" onClick={send} disabled={sending}>
                       <Send size={19}/>
-                      {sending ? 'Processing…' : scheduledAt ? 'Schedule WhatsApp Campaign' : 'Send WhatsApp Message'}
+                      {sending
+                        ? 'Processing…'
+                        : deliveryMode === 'daily'
+                          ? 'Schedule Daily Campaign'
+                          : deliveryMode === 'once'
+                            ? 'Schedule WhatsApp Campaign'
+                            : 'Send WhatsApp Message'}
                     </button>
                   </div>
                   <div className="send-meta">
@@ -354,11 +391,13 @@ export default function App() {
       <CampaignHistory
         open={historyOpen}
         campaigns={campaigns}
+        recurringCampaigns={recurringCampaigns}
         loading={historyLoading}
         error={historyError}
         onClose={() => setHistoryOpen(false)}
         onCancel={cancelScheduledCampaign}
         onReschedule={rescheduleScheduledCampaign}
+        onRecurringAction={updateRecurringSchedule}
       />
       <TemplateManager
         open={templateManagerOpen}
