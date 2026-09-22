@@ -110,6 +110,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         header_type: template.headerType || null,
         media_url: String(mediaUrl || '').trim() || null,
         variable_values: variableValues || {},
+        variable_count: template.variables,
         timezone: timezoneValue,
         start_at: scheduleDate!.toISOString(),
         next_run_at: scheduleDate!.toISOString(),
