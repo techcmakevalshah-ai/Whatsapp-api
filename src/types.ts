@@ -37,3 +37,17 @@ export type CampaignSummary = {
   createdAt: string;
   totalRecipients: number;
 };
+
+export type ManagedWhatsAppTemplate = {
+  id: string;
+  providerTemplateId?: string | null;
+  name: string;
+  language: string;
+  category: 'MARKETING' | 'UTILITY' | 'AUTHENTICATION' | string;
+  body: string;
+  footer?: string | null;
+  status: 'DRAFT' | 'APPROVED' | 'SUBMITTED' | 'PENDING' | 'REJECTED' | 'PAUSED' | 'DISABLED' | string;
+  variables: number;
+  createdAt: string;
+  updatedAt: string;
+};
