@@ -19,6 +19,8 @@ export function ContactsManager({
   onChanged: (contacts: Contact[], syncedAt: string) => void;
 }) {
   const [query, setQuery] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'Active' | 'Inactive'>('all');
   const [adding, setAdding] = useState(false);
   const [changingStatusId, setChangingStatusId] = useState('');
   const [localError, setLocalError] = useState('');
@@ -29,15 +31,24 @@ export function ContactsManager({
     status: 'Active' as 'Active' | 'Inactive',
   });
 
+  const categories = useMemo(
+    () => [...new Set(contacts.map((contact) => contact.category).filter(Boolean))]
+      .sort((a, b) => a.localeCompare(b)),
+    [contacts],
+  );
+
   const filtered = useMemo(() => {
     const term = query.trim().toLowerCase();
-    if (!term) return contacts;
-    return contacts.filter((contact) =>
-      `${contact.name} ${contact.phone} ${contact.category} ${contact.status}`
+
+    return contacts.filter((contact) => {
+      const matchesSearch = !term || `${contact.name} ${contact.phone} ${contact.category} ${contact.status}`
         .toLowerCase()
-        .includes(term),
-    );
-  }, [contacts, query]);
+        .includes(term);
+      const matchesCategory = categoryFilter === 'all' || contact.category === categoryFilter;
+      const matchesStatus = statusFilter === 'all' || contact.status === statusFilter;
+      return matchesSearch && matchesCategory && matchesStatus;
+    });
+  }, [contacts, query, categoryFilter, statusFilter]);
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
@@ -167,13 +178,36 @@ export function ContactsManager({
             </small>
           </div>
 
-          <div className="search contacts-search">
-            <Search size={17}/>
-            <input
-              placeholder="Search name, mobile, category or status…"
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-            />
+          <div className="contacts-manager-filters">
+            <div className="search contacts-search">
+              <Search size={17}/>
+              <input
+                placeholder="Search name, mobile, category or status…"
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+              />
+            </div>
+
+            <select
+              className="filter-select"
+              value={categoryFilter}
+              onChange={(event) => setCategoryFilter(event.target.value)}
+            >
+              <option value="all">All categories</option>
+              {categories.map((category) => (
+                <option key={category} value={category}>{category}</option>
+              ))}
+            </select>
+
+            <select
+              className="filter-select"
+              value={statusFilter}
+              onChange={(event) => setStatusFilter(event.target.value as 'all' | 'Active' | 'Inactive')}
+            >
+              <option value="all">All status</option>
+              <option value="Active">Active</option>
+              <option value="Inactive">Inactive</option>
+            </select>
           </div>
         </div>
 
