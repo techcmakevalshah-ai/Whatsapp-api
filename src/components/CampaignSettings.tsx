@@ -1,0 +1,3 @@
+export function CampaignSettings({ name, setName, scheduledAt, setScheduledAt }: { name: string; setName: (v:string)=>void; scheduledAt: string; setScheduledAt:(v:string)=>void }) {
+  return <section className="card soft-purple"><div className="section-title purple-text"><span className="step purple">5</span> Campaign Settings</div><div className="settings-grid"><label><span>Campaign Name</span><input value={name} onChange={e=>setName(e.target.value)} placeholder="e.g. Dholera Weekly Update"/></label><label><span>Schedule <small>(Optional)</small></span><input type="datetime-local" value={scheduledAt} onChange={e=>setScheduledAt(e.target.value)}/></label></div></section>;
+}
