@@ -97,3 +97,16 @@ export function sendTestMessage(payload: {
 }): Promise<{ ok: true; messageId?: string | null; phoneLast4: string }> {
   return json('/api/whatsapp/test', { method: 'POST', body: JSON.stringify(payload) });
 }
+
+export function addContact(payload: {
+  name: string;
+  phone: string;
+  category?: string;
+  status?: 'Active' | 'Inactive';
+}): Promise<{ contact: Contact; contacts: Contact[]; syncedAt: string }> {
+  return json('/api/contacts', { method: 'POST', body: JSON.stringify(payload) });
+}
+
+export function deleteContact(id: string): Promise<{ ok: true; contacts: Contact[]; syncedAt: string }> {
+  return json(`/api/contacts?id=${encodeURIComponent(id)}`, { method: 'DELETE' });
+}
