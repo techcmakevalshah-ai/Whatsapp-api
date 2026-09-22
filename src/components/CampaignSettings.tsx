@@ -1,4 +1,6 @@
-import { CalendarClock, Clock3, Send } from 'lucide-react';
+import { CalendarClock, Clock3, Repeat2, Send } from 'lucide-react';
+
+export type DeliveryMode = 'now' | 'once' | 'daily';
 
 function toLocalInput(date: Date) {
   const shifted = new Date(date.getTime() - date.getTimezoneOffset() * 60_000);
@@ -10,14 +12,21 @@ export function CampaignSettings({
   setName,
   scheduledAt,
   setScheduledAt,
+  deliveryMode,
+  setDeliveryMode,
+  recurrenceDays,
+  setRecurrenceDays,
 }: {
   name: string;
   setName: (v: string) => void;
   scheduledAt: string;
   setScheduledAt: (v: string) => void;
+  deliveryMode: DeliveryMode;
+  setDeliveryMode: (v: DeliveryMode) => void;
+  recurrenceDays: number;
+  setRecurrenceDays: (v: number) => void;
 }) {
   const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
-  const scheduleMode = Boolean(scheduledAt);
   const minSchedule = toLocalInput(new Date(Date.now() + 60_000));
   const maxSchedule = toLocalInput(new Date(Date.now() + 366 * 24 * 60 * 60 * 1000));
 
@@ -32,6 +41,24 @@ export function CampaignSettings({
     setScheduledAt(toLocalInput(date));
   };
 
+  const selectMode = (mode: DeliveryMode) => {
+    setDeliveryMode(mode);
+    if (mode === 'now') {
+      setScheduledAt('');
+      return;
+    }
+    if (!scheduledAt) setQuick(15);
+  };
+
+  const lastRun = (() => {
+    if (deliveryMode !== 'daily' || !scheduledAt || !recurrenceDays) return null;
+    const start = new Date(scheduledAt);
+    if (Number.isNaN(start.getTime())) return null;
+    const end = new Date(start);
+    end.setDate(end.getDate() + recurrenceDays - 1);
+    return end;
+  })();
+
   return (
     <section className="card soft-purple campaign-settings-card">
       <div className="section-title purple-text">
@@ -45,38 +72,43 @@ export function CampaignSettings({
           <input
             value={name}
             onChange={(event) => setName(event.target.value)}
-            placeholder="e.g. Dholera Weekly Update"
+            placeholder="e.g. Dholera Daily Update"
           />
         </label>
 
         <div className="schedule-mode-field">
           <span className="schedule-field-label">Delivery</span>
-          <div className="schedule-mode-toggle">
+          <div className="schedule-mode-toggle schedule-mode-three">
             <button
               type="button"
-              className={!scheduleMode ? 'active' : ''}
-              onClick={() => setScheduledAt('')}
+              className={deliveryMode === 'now' ? 'active' : ''}
+              onClick={() => selectMode('now')}
             >
               <Send size={14}/> Send Now
             </button>
             <button
               type="button"
-              className={scheduleMode ? 'active' : ''}
-              onClick={() => {
-                if (!scheduledAt) setQuick(15);
-              }}
+              className={deliveryMode === 'once' ? 'active' : ''}
+              onClick={() => selectMode('once')}
             >
-              <CalendarClock size={14}/> Schedule Later
+              <CalendarClock size={14}/> Schedule Once
+            </button>
+            <button
+              type="button"
+              className={deliveryMode === 'daily' ? 'active' : ''}
+              onClick={() => selectMode('daily')}
+            >
+              <Repeat2 size={14}/> Repeat Daily
             </button>
           </div>
         </div>
       </div>
 
-      {scheduleMode && (
+      {deliveryMode !== 'now' && (
         <div className="schedule-panel">
           <div className="schedule-input-row">
             <label>
-              <span>Send Date & Time</span>
+              <span>{deliveryMode === 'daily' ? 'First Send Date & Time' : 'Send Date & Time'}</span>
               <input
                 type="datetime-local"
                 min={minSchedule}
@@ -86,11 +118,27 @@ export function CampaignSettings({
               />
             </label>
 
+            {deliveryMode === 'daily' && (
+              <label className="recurrence-days-field">
+                <span>Number of Days</span>
+                <input
+                  type="number"
+                  min={1}
+                  max={90}
+                  value={recurrenceDays}
+                  onChange={(event) => {
+                    const value = Number(event.target.value);
+                    setRecurrenceDays(Number.isFinite(value) ? Math.max(1, Math.min(90, value)) : 1);
+                  }}
+                />
+              </label>
+            )}
+
             <div className="schedule-timezone">
               <Clock3 size={16}/>
               <div>
                 <b>{timezone}</b>
-                <small>Scheduling uses your browser timezone.</small>
+                <small>Uses your browser timezone.</small>
               </div>
             </div>
           </div>
@@ -102,8 +150,24 @@ export function CampaignSettings({
             <button type="button" onClick={setTomorrowMorning}>Tomorrow 9:00 AM</button>
           </div>
 
+          {deliveryMode === 'daily' && (
+            <div className="recurrence-summary">
+              <Repeat2 size={16}/>
+              <div>
+                <b>{'Daily for ' + recurrenceDays + ' day' + (recurrenceDays === 1 ? '' : 's')}</b>
+                <span>
+                  {scheduledAt
+                    ? <>{'First: ' + new Date(scheduledAt).toLocaleString()}{lastRun ? ' · Last: ' + lastRun.toLocaleString() : ''}</>
+                    : 'Choose the first send date and time.'}
+                </span>
+              </div>
+            </div>
+          )}
+
           <div className="schedule-note">
-            Scheduled campaigns are checked every minute. You can cancel or reschedule them from Campaign History until sending starts.
+            {deliveryMode === 'daily'
+              ? 'The same approved template, variables and media will be used each day. Only contacts that are still Active in Google Sheets at send time will receive that day’s message. You can pause, resume or cancel the series from Campaign History.'
+              : 'Scheduled campaigns are checked every minute. You can cancel or reschedule them from Campaign History until sending starts.'}
           </div>
         </div>
       )}
