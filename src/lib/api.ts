@@ -1,5 +1,5 @@
 import { supabase } from './supabase';
-import type { CampaignSummary, Contact, RecipientStatus, WhatsAppTemplate } from '../types';
+import type { CampaignSummary, Contact, ManagedWhatsAppTemplate, RecipientStatus, WhatsAppTemplate } from '../types';
 
 async function json<T>(url: string, init?: RequestInit): Promise<T> {
   const headers = new Headers(init?.headers);
@@ -49,4 +49,39 @@ export function getCampaignStatus(campaignId: string): Promise<{
 
 export function getCampaigns(): Promise<{ campaigns: CampaignSummary[] }> {
   return json('/api/campaigns');
+}
+
+export function getManagedTemplates(): Promise<{ templates: ManagedWhatsAppTemplate[] }> {
+  return json('/api/templates');
+}
+
+export function createManagedTemplate(payload: {
+  name: string;
+  language: string;
+  category: string;
+  body: string;
+  footer?: string;
+  status: 'DRAFT' | 'APPROVED';
+  confirmProviderApproved?: boolean;
+}): Promise<{ template: ManagedWhatsAppTemplate }> {
+  return json('/api/templates', { method: 'POST', body: JSON.stringify(payload) });
+}
+
+export function updateManagedTemplate(id: string, payload: {
+  name: string;
+  language: string;
+  category: string;
+  body: string;
+  footer?: string;
+  status: 'DRAFT' | 'APPROVED';
+  confirmProviderApproved?: boolean;
+}): Promise<{ template: ManagedWhatsAppTemplate }> {
+  return json(`/api/templates?id=${encodeURIComponent(id)}`, {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
+  });
+}
+
+export function disableManagedTemplate(id: string): Promise<{ ok: true }> {
+  return json(`/api/templates?id=${encodeURIComponent(id)}`, { method: 'DELETE' });
 }
