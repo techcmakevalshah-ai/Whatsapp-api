@@ -38,8 +38,19 @@ function parseOfficialWaTemplates(): Template[] {
     }
     const language = process.env.OFFICIALWA_TEMPLATE_LANGUAGE || 'en';
     const variables = Number(process.env.OFFICIALWA_TEMPLATE_VARIABLES || '0');
+    const knownBodies: Record<string, string> = {
+      '22nd_aug_3': [
+        '5 hours {{1}}',
+        '{{2}} land as an asset, {{3}} again.',
+        'Co{{4}} way.',
+        '👉 {{5}}',
+        'Thank you.',
+      ].join('\n'),
+    };
+
     const body =
       process.env.OFFICIALWA_TEMPLATE_BODY ||
+      knownBodies[name] ||
       [
         `Template: ${name}`,
         ...Array.from({ length: Number.isFinite(variables) ? variables : 0 }, (_, i) => `{{${i + 1}}}`),
