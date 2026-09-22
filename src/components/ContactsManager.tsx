@@ -1,6 +1,6 @@
-import { Plus, RefreshCw, Search, Trash2, UserRound } from 'lucide-react';
+import { Ban, CheckCircle2, Plus, RefreshCw, Search, UserRound } from 'lucide-react';
 import { useMemo, useState, type FormEvent } from 'react';
-import { addContact, deleteContact } from '../lib/api';
+import { addContact, setContactStatus } from '../lib/api';
 import type { Contact } from '../types';
 
 export function ContactsManager({
@@ -20,7 +20,7 @@ export function ContactsManager({
 }) {
   const [query, setQuery] = useState('');
   const [adding, setAdding] = useState(false);
-  const [deletingId, setDeletingId] = useState('');
+  const [changingStatusId, setChangingStatusId] = useState('');
   const [localError, setLocalError] = useState('');
   const [form, setForm] = useState({
     name: '',
@@ -63,21 +63,24 @@ export function ContactsManager({
     }
   };
 
-  const remove = async (contact: Contact) => {
+  const changeStatus = async (contact: Contact) => {
+    const nextStatus = contact.status === 'Active' ? 'Inactive' : 'Active';
     const confirmed = window.confirm(
-      `Delete ${contact.name} (${contact.phone}) from the Google Sheet? This cannot be undone.`,
+      nextStatus === 'Inactive'
+        ? `Deactivate ${contact.name}? The row will remain in Google Sheets and can be reactivated later.`
+        : `Reactivate ${contact.name}?`,
     );
     if (!confirmed) return;
 
-    setDeletingId(contact.id);
+    setChangingStatusId(contact.id);
     setLocalError('');
     try {
-      const result = await deleteContact(contact.id);
+      const result = await setContactStatus(contact.id, nextStatus);
       onChanged(result.contacts, result.syncedAt);
     } catch (err) {
-      setLocalError(err instanceof Error ? err.message : 'Unable to delete contact.');
+      setLocalError(err instanceof Error ? err.message : 'Unable to update contact status.');
     } finally {
-      setDeletingId('');
+      setChangingStatusId('');
     }
   };
 
@@ -86,7 +89,7 @@ export function ContactsManager({
       <div className="contacts-page-head">
         <div>
           <h1>Contacts</h1>
-          <p>Live contacts from your Google Sheet. Changes here update the Sheet directly.</p>
+          <p>Live contacts from your Google Sheet. Contacts can be added or deactivated; permanent deletion is blocked.</p>
         </div>
         <button className="btn secondary" onClick={() => void onRefresh()} disabled={loading}>
           <RefreshCw size={16} className={loading ? 'spin' : ''}/>
@@ -201,13 +204,17 @@ export function ContactsManager({
                   </td>
                   <td>
                     <button
-                      className="contact-delete-button"
-                      onClick={() => void remove(contact)}
-                      disabled={deletingId === contact.id}
-                      title="Delete contact"
+                      className={`contact-status-button ${contact.status === 'Active' ? 'deactivate' : 'activate'}`}
+                      onClick={() => void changeStatus(contact)}
+                      disabled={changingStatusId === contact.id}
+                      title={contact.status === 'Active' ? 'Deactivate contact' : 'Reactivate contact'}
                     >
-                      <Trash2 size={15}/>
-                      {deletingId === contact.id ? 'Deleting…' : 'Delete'}
+                      {contact.status === 'Active' ? <Ban size={15}/> : <CheckCircle2 size={15}/>}
+                      {changingStatusId === contact.id
+                        ? 'Updating…'
+                        : contact.status === 'Active'
+                          ? 'Deactivate'
+                          : 'Reactivate'}
                     </button>
                   </td>
                 </tr>
