@@ -1,7 +1,8 @@
-import { Ban, Copy, Image as ImageIcon, Pencil, Plus, Save, Upload } from 'lucide-react';
+import { Ban, Copy, Image as ImageIcon, Pencil, Plus, Save, Trash2, Upload } from 'lucide-react';
 import { useEffect, useMemo, useState, type ChangeEvent } from 'react';
 import {
   createMessageSeries,
+  deleteMessageSeriesPermanently,
   disableMessageSeries,
   getMessageSeries,
   updateMessageSeries,
@@ -55,9 +56,11 @@ function safeFileName(value: string) {
 export function SeriesManager({
   templates,
   onSeriesChanged,
+  isAdmin,
 }: {
   templates: ManagedWhatsAppTemplate[];
   onSeriesChanged?: () => void | Promise<void>;
+  isAdmin: boolean;
 }) {
   const approvedTemplates = useMemo(
     () => templates.filter((template) => template.status === 'APPROVED'),
@@ -298,6 +301,31 @@ export function SeriesManager({
     }
   };
 
+  const permanentlyDelete = async (series: MessageSeries) => {
+    if (!isAdmin) return;
+
+    const confirmation = window.prompt(
+      `Permanent deletion is only allowed for unused series. Type the exact series name to delete it:\n\n${series.name}`,
+      '',
+    );
+
+    if (confirmation === null) return;
+    if (confirmation.trim() !== series.name) {
+      setError('Series name did not match. Permanent deletion was cancelled.');
+      return;
+    }
+
+    setError('');
+    try {
+      await deleteMessageSeriesPermanently(series.id);
+      if (editingId === series.id) reset();
+      await load();
+      await onSeriesChanged?.();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unable to permanently delete series.');
+    }
+  };
+
   return (
     <div className="series-manager-layout">
       <section className="series-builder">
@@ -535,6 +563,16 @@ export function SeriesManager({
                   {series.status !== 'INACTIVE' && (
                     <button className="btn danger-outline" type="button" onClick={() => void disable(series)}>
                       <Ban size={14}/> Disable
+                    </button>
+                  )}
+                  {isAdmin && (
+                    <button
+                      className="btn danger-outline series-permanent-delete"
+                      type="button"
+                      title="Admin only · permanently deletes unused series"
+                      onClick={() => void permanentlyDelete(series)}
+                    >
+                      <Trash2 size={14}/> Delete Permanently
                     </button>
                   )}
                 </div>
