@@ -118,3 +118,21 @@ export type TemplateFolder = {
   createdAt: string;
   updatedAt: string;
 };
+
+export type StaffProfile = {
+  id: string;
+  email: string;
+  fullName: string;
+  role: 'admin' | 'staff';
+};
+
+export type StaffUserProfile = StaffProfile & {
+  active: boolean;
+  revokedAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  emailConfirmedAt?: string | null;
+  invitedAt?: string | null;
+  lastSignInAt?: string | null;
+  authStatus: 'invited' | 'registered' | string;
+};
