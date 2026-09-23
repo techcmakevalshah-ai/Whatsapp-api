@@ -285,3 +285,16 @@
 .invite-password-card p{max-width:360px;margin-left:auto;margin-right:auto}
 @media(max-width:1000px){.user-invite-form{grid-template-columns:1fr 1fr}.user-invite-form .contact-add-button{grid-column:1/-1}}
 @media(max-width:700px){.user-invite-form{grid-template-columns:1fr}.user-invite-form .contact-add-button{grid-column:auto}.admin-profile-badge{width:100%}.user-row-actions{flex-wrap:wrap}}
+
+.user-delete-btn{background:#fff1f2;border:1px solid #fecdd3;color:#b42318}
+.user-delete-btn:hover{background:#ffe4e6}
+.user-delete-modal{width:min(520px,calc(100vw - 32px));background:#fff;border-radius:14px;padding:18px;box-shadow:0 24px 70px rgba(15,23,42,.24)}
+.user-delete-target{display:flex;align-items:center;gap:10px;margin:14px 0;padding:12px;border:1px solid #fecdd3;background:#fff7f7;border-radius:9px;color:#991b1b}
+.user-delete-target>div{display:flex;flex-direction:column;gap:2px}.user-delete-target b{font-size:12px}.user-delete-target span{font-size:10px;color:#7f1d1d}
+.user-delete-warning{font-size:11px;line-height:1.5;color:#7c2d12;background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;padding:10px}
+.user-delete-password{display:flex;flex-direction:column;gap:6px;margin-top:12px;color:#334155;font-size:11px;font-weight:750}
+.user-delete-password>div{display:flex;align-items:center;gap:8px;border:1px solid #dbe3ec;border-radius:8px;padding:0 10px}
+.user-delete-password input{border:0;outline:none;width:100%;padding:11px 0;font:inherit;background:transparent}
+.user-delete-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:14px}
+.user-delete-confirm-btn{background:#b42318;border:1px solid #b42318;color:#fff}
+.user-delete-confirm-btn:disabled{opacity:.55;cursor:not-allowed}
