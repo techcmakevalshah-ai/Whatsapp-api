@@ -791,3 +791,78 @@ tbody tr:hover{background:#fafcff}
   .user{gap:7px!important}
   .topbar-profile{display:none}
 }
+
+
+/* Live dashboard */
+.dashboard-page{display:flex;flex-direction:column;gap:18px}
+.dashboard-hero{display:flex;justify-content:space-between;align-items:flex-end;gap:18px;margin-bottom:2px}
+.dashboard-hero h1{margin:5px 0 4px;font-size:30px;letter-spacing:-.04em;color:#0c1d34}
+.dashboard-hero p{margin:0;color:#718198;font-size:12px}
+.dashboard-kicker{display:inline-flex;align-items:center;gap:6px;color:#15803d;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.055em}
+.dashboard-hero-actions{display:flex;gap:9px;align-items:center}
+.dashboard-primary-action{min-height:36px;padding:0 14px;border:0}
+.dashboard-stat-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}
+.dashboard-stat-card{background:#fff;border:1px solid var(--ui-border);border-radius:14px;padding:16px;display:flex;gap:12px;align-items:flex-start;box-shadow:var(--ui-shadow-sm)}
+.dashboard-stat-card>div{display:flex;flex-direction:column;min-width:0}
+.dashboard-stat-card small{color:#7e8b9d;font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.045em}
+.dashboard-stat-card strong{font-size:26px;line-height:1.1;margin:5px 0 3px;color:#11223a;letter-spacing:-.035em}
+.dashboard-stat-card span:last-child{font-size:10px;color:#8390a2}
+.dashboard-stat-icon{width:36px;height:36px;display:grid;place-items:center;border-radius:10px;flex:0 0 auto}
+.green-bg{background:#eaf8ef;color:#15803d}.blue-bg{background:#edf3ff;color:#315cc9}.teal-bg{background:#e9faf8;color:#0f8f84}.purple-bg{background:#f3efff;color:#6b49c8}
+.dashboard-main-grid{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(280px,.7fr);gap:16px}
+.dashboard-side-stack{display:flex;flex-direction:column;gap:16px}
+.dashboard-panel{background:#fff;border:1px solid var(--ui-border);border-radius:14px;padding:16px;box-shadow:var(--ui-shadow-sm)}
+.dashboard-panel-head{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;margin-bottom:16px}
+.dashboard-panel-head.compact{margin-bottom:12px}
+.dashboard-panel-head h2{font-size:13px;margin:0 0 3px;color:#14253e;letter-spacing:-.015em}
+.dashboard-panel-head p{font-size:10px;margin:0;color:#8390a2}
+.dashboard-legend{display:flex;align-items:center;gap:10px;color:#66758b;font-size:9px}
+.dashboard-legend span{display:inline-flex;align-items:center;gap:4px}
+.dashboard-legend i{display:block;width:7px;height:7px;border-radius:2px}
+.legend-sent{background:#4f6ed5}.legend-delivered{background:#20a68f}.legend-read{background:#8b5fd3}
+.dashboard-chart{height:210px;display:flex;align-items:flex-end;gap:12px;padding:18px 8px 0;border-top:1px solid #eef1f5;border-bottom:1px solid #eef1f5;background:linear-gradient(180deg,#fcfdff,#fff);position:relative}
+.dashboard-chart-day{flex:1;height:100%;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;gap:8px;min-width:34px}
+.dashboard-bar-cluster{height:160px;width:100%;display:flex;justify-content:center;align-items:flex-end;gap:4px}
+.dashboard-bar{display:block;width:min(10px,24%);min-height:4px;border-radius:5px 5px 2px 2px;transition:height .25s ease}
+.sent-bar{background:#4f6ed5}.delivered-bar{background:#20a68f}.read-bar{background:#8b5fd3}
+.dashboard-chart-day small{font-size:9px;color:#7e8999;font-weight:700}
+.dashboard-chart-empty{position:absolute;inset:0;display:grid;place-items:center;color:#8b96a6;font-size:11px}
+.dashboard-delivery-strip{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:12px}
+.dashboard-delivery-strip>div{display:grid;grid-template-columns:auto 1fr;grid-template-areas:"icon label" "icon value";column-gap:7px;align-items:center;padding:9px;border-radius:9px;background:#f8fafc;border:1px solid #edf1f5}
+.dashboard-delivery-strip svg{grid-area:icon;color:#697b92}
+.dashboard-delivery-strip span{grid-area:label;font-size:8px;color:#8a97a7;text-transform:uppercase;font-weight:800;letter-spacing:.04em}
+.dashboard-delivery-strip b{grid-area:value;font-size:13px;color:#1a2c44}
+.dashboard-automation-list{display:flex;flex-direction:column}
+.dashboard-automation-list>div{display:grid;grid-template-columns:30px 1fr auto;gap:8px;align-items:center;padding:10px 0;border-bottom:1px solid #eef1f5}
+.dashboard-automation-list>div:last-child{border-bottom:0}
+.automation-icon{width:28px;height:28px;border-radius:8px;background:#f2f5f9;display:grid;place-items:center;color:#52667f}
+.dashboard-automation-list span:nth-child(2){font-size:10px;color:#53647b;font-weight:650}
+.dashboard-automation-list b{font-size:15px;color:#192b44}
+.dashboard-content-ready{min-height:116px;display:flex;flex-direction:column;justify-content:center;align-items:center;border:1px dashed #dce3ec;border-radius:11px;background:#fbfcfe}
+.dashboard-content-ready strong{font-size:28px;color:#315cc9;line-height:1}
+.dashboard-content-ready span{font-size:10px;font-weight:750;color:#4c5e76;margin-top:5px}
+.dashboard-content-ready small{font-size:9px;color:#95a0af;margin-top:3px}
+.dashboard-recent-panel{padding-bottom:14px}
+.dashboard-recent-table{border-radius:10px}
+.dashboard-recent-table td:first-child{min-width:170px}
+.dashboard-date{display:block;margin-top:3px;color:#95a0af;font-size:8px;font-weight:500}
+@media(max-width:1100px){
+  .dashboard-stat-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .dashboard-main-grid{grid-template-columns:1fr}
+  .dashboard-side-stack{display:grid;grid-template-columns:1fr 1fr}
+}
+@media(max-width:700px){
+  .dashboard-hero{flex-direction:column;align-items:stretch}
+  .dashboard-hero-actions{width:100%}
+  .dashboard-hero-actions>*{flex:1;justify-content:center}
+  .dashboard-stat-grid{grid-template-columns:1fr 1fr;gap:10px}
+  .dashboard-stat-card{padding:13px}
+  .dashboard-stat-card strong{font-size:22px}
+  .dashboard-stat-icon{width:32px;height:32px}
+  .dashboard-side-stack{grid-template-columns:1fr}
+  .dashboard-chart{gap:5px;padding-left:2px;padding-right:2px}
+  .dashboard-bar-cluster{gap:2px}
+  .dashboard-delivery-strip{grid-template-columns:1fr 1fr}
+  .dashboard-panel-head{flex-direction:column}
+  .dashboard-legend{align-self:flex-start}
+}
