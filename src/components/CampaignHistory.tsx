@@ -1,6 +1,6 @@
 import { CalendarClock, Pause, Play, Save, X, XCircle } from 'lucide-react';
 import { useState } from 'react';
-import type { CampaignSummary, RecurringCampaignSummary } from '../types';
+import type { CampaignSummary, MessageSeriesScheduleSummary, RecurringCampaignSummary } from '../types';
 
 function toLocalInput(iso?: string | null) {
   if (!iso) return '';
@@ -25,22 +25,26 @@ export function CampaignHistory({
   open,
   campaigns,
   recurringCampaigns,
+  messageSeriesSchedules,
   loading,
   error,
   onClose,
   onCancel,
   onReschedule,
   onRecurringAction,
+  onMessageSeriesAction,
 }: {
   open: boolean;
   campaigns: CampaignSummary[];
   recurringCampaigns: RecurringCampaignSummary[];
+  messageSeriesSchedules: MessageSeriesScheduleSummary[];
   loading: boolean;
   error: string;
   onClose: () => void;
   onCancel: (campaign: CampaignSummary) => Promise<void>;
   onReschedule: (campaign: CampaignSummary, scheduledAt: string, timezone: string) => Promise<void>;
   onRecurringAction: (campaign: RecurringCampaignSummary, action: 'pause' | 'resume' | 'cancel') => Promise<void>;
+  onMessageSeriesAction: (schedule: MessageSeriesScheduleSummary, action: 'pause' | 'resume' | 'cancel') => Promise<void>;
 }) {
   const [editingId, setEditingId] = useState('');
   const [rescheduleValue, setRescheduleValue] = useState('');
@@ -122,6 +126,28 @@ export function CampaignHistory({
       await onRecurringAction(campaign, action);
     } catch (err) {
       setActionError(err instanceof Error ? err.message : 'Unable to update recurring campaign.');
+    } finally {
+      setBusyId('');
+    }
+  };
+
+  const messageSeriesAction = async (
+    schedule: MessageSeriesScheduleSummary,
+    action: 'pause' | 'resume' | 'cancel',
+  ) => {
+    if (action === 'cancel') {
+      const confirmed = window.confirm(
+        'Cancel message series "' + schedule.name + '"? All future series days will stop.',
+      );
+      if (!confirmed) return;
+    }
+
+    setBusyId(schedule.id);
+    setActionError('');
+    try {
+      await onMessageSeriesAction(schedule, action);
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : 'Unable to update message series.');
     } finally {
       setBusyId('');
     }
@@ -222,6 +248,90 @@ export function CampaignHistory({
           </div>
         ) : (
           <div className="empty-state compact-empty">No recurring schedules yet.</div>
+        )}
+
+        <div className="history-section-title one-time-title">Message Series Schedules</div>
+        {loading ? (
+          <div className="empty-state">Loading message series…</div>
+        ) : messageSeriesSchedules.length ? (
+          <div className="table-wrap recurring-history-table">
+            <table>
+              <thead>
+                <tr>
+                  <th>Campaign</th>
+                  <th>Series</th>
+                  <th>Recipients</th>
+                  <th>Progress</th>
+                  <th>Status</th>
+                  <th>Next Send</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {messageSeriesSchedules.map((schedule) => (
+                  <tr key={schedule.id}>
+                    <td>
+                      <b>{schedule.name}</b>
+                      {schedule.schedulerError && (
+                        <small className="campaign-scheduler-error">{schedule.schedulerError}</small>
+                      )}
+                    </td>
+                    <td>{schedule.seriesName}</td>
+                    <td>{schedule.totalRecipients}</td>
+                    <td>
+                      <b>{schedule.runsCreated}/{schedule.totalDays}</b>
+                      <small className="campaign-timezone">
+                        {Math.max(0, schedule.totalDays - schedule.runsCreated)} remaining
+                      </small>
+                    </td>
+                    <td>
+                      <span className={'pill ' + statusClass(schedule.status)}>
+                        {statusLabel(schedule.status)}
+                      </span>
+                    </td>
+                    <td>
+                      {schedule.nextRunAt ? new Date(schedule.nextRunAt).toLocaleString() : '—'}
+                      <small className="campaign-timezone">{schedule.timezone}</small>
+                    </td>
+                    <td>
+                      <div className="campaign-history-actions">
+                        {schedule.status === 'active' && (
+                          <button
+                            className="btn schedule-history-button"
+                            disabled={busyId === schedule.id}
+                            onClick={() => void messageSeriesAction(schedule, 'pause')}
+                          >
+                            <Pause size={14}/> Pause
+                          </button>
+                        )}
+                        {schedule.status === 'paused' && (
+                          <button
+                            className="btn schedule-history-button"
+                            disabled={busyId === schedule.id}
+                            onClick={() => void messageSeriesAction(schedule, 'resume')}
+                          >
+                            <Play size={14}/> Resume
+                          </button>
+                        )}
+                        {['active', 'paused'].includes(schedule.status) && (
+                          <button
+                            className="btn cancel-history-button"
+                            disabled={busyId === schedule.id}
+                            onClick={() => void messageSeriesAction(schedule, 'cancel')}
+                          >
+                            <XCircle size={14}/> Cancel
+                          </button>
+                        )}
+                        {!['active', 'paused'].includes(schedule.status) && '—'}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="empty-state compact-empty">No message series schedules yet.</div>
         )}
 
         <div className="history-section-title one-time-title">One-time Campaigns & Daily Send Records</div>
