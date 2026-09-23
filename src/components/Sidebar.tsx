@@ -1,14 +1,16 @@
-import { BarChart3, ContactRound, FolderOpen, LayoutDashboard, MessageCircle, Settings } from 'lucide-react';
+import { BarChart3, ContactRound, FolderOpen, LayoutDashboard, MessageCircle, Settings, ShieldCheck } from 'lucide-react';
 
-export type AppPage = 'whatsapp' | 'contacts';
+export type AppPage = 'whatsapp' | 'contacts' | 'users';
 
 export function Sidebar({
   page,
+  isAdmin,
   onNavigate,
   onHistory,
   onTemplates,
 }: {
   page: AppPage;
+  isAdmin: boolean;
   onNavigate: (page: AppPage) => void;
   onHistory: () => void;
   onTemplates: () => void;
@@ -35,6 +37,15 @@ export function Sidebar({
         >
           <MessageCircle size={18}/><span>WhatsApp</span>
         </button>
+
+        {isAdmin && (
+          <button
+            className={`nav-item nav-button ${page === 'users' ? 'active' : ''}`}
+            onClick={() => onNavigate('users')}
+          >
+            <ShieldCheck size={18}/><span>Users & Access</span>
+          </button>
+        )}
 
         <div className="nav-item nav-disabled" title="Coming later">
           <FolderOpen size={18}/><span>Google Drive</span>
