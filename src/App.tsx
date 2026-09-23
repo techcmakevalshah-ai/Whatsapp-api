@@ -603,18 +603,21 @@ export default function App() {
                     </button>
                   </div>
                   {deliveryMode === 'series' && seriesScheduleSuccess && (
-                    <div className="series-schedule-success" role="status" aria-live="polite">
-                      <div>
-                        <b>Message series scheduled</b>
-                        <span>{seriesScheduleSuccess}</span>
+                    <div className="series-schedule-success-row">
+                      <div aria-hidden="true" />
+                      <div className="series-schedule-success" role="status" aria-live="polite">
+                        <div>
+                          <b>Message series scheduled</b>
+                          <span>{seriesScheduleSuccess}</span>
+                        </div>
+                        <button
+                          type="button"
+                          className="series-schedule-history-link"
+                          onClick={() => void openHistory()}
+                        >
+                          View Campaign History →
+                        </button>
                       </div>
-                      <button
-                        type="button"
-                        className="series-schedule-history-link"
-                        onClick={() => void openHistory()}
-                      >
-                        View Campaign History →
-                      </button>
                     </div>
                   )}
                   <div className="send-meta">
