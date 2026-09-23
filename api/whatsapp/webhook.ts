@@ -198,19 +198,27 @@ async function applyStatus(
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method === 'GET') {
-    const mode = req.query['hub.mode'];
-    const token = req.query['hub.verify_token'];
-    const challenge = req.query['hub.challenge'];
+    // OfficialWA verifies outbound webhook URLs with a challenge request.
+    // Its setup UI does not expose a user-defined verify token, so echo the
+    // challenge when present instead of requiring WHATSAPP_VERIFY_TOKEN.
+    const challenge =
+      req.query['hub.challenge'] ??
+      req.query.challenge ??
+      req.query['challenge_token'] ??
+      req.query['verify_challenge'];
 
-    if (
-      mode === 'subscribe' &&
-      process.env.WHATSAPP_VERIFY_TOKEN &&
-      token === process.env.WHATSAPP_VERIFY_TOKEN
-    ) {
-      return res.status(200).send(String(challenge || ''));
+    if (challenge !== undefined && challenge !== null) {
+      return res
+        .status(200)
+        .setHeader('Content-Type', 'text/plain; charset=utf-8')
+        .send(String(Array.isArray(challenge) ? challenge[0] : challenge));
     }
 
-    return res.status(200).json({ ok: true, webhook: 'officialwa' });
+    // Some providers only check that the endpoint is publicly reachable.
+    return res
+      .status(200)
+      .setHeader('Content-Type', 'text/plain; charset=utf-8')
+      .send('OK');
   }
 
   if (req.method !== 'POST') {
