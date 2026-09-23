@@ -113,12 +113,11 @@ async function findRecentRecipientFallback(
     .from('campaign_recipients')
     .select('id, status, provider_message_id, sent_at, campaign:campaigns!inner(template_name)')
     .eq('phone', phone)
-    .is('provider_message_id', null)
     .not('sent_at', 'is', null)
     .gte('sent_at', earliest)
     .lte('sent_at', eventAt.toISOString())
     .order('sent_at', { ascending: false })
-    .limit(5);
+    .limit(8);
 
   if (candidate.templateName) {
     query = query.eq('campaign.template_name', candidate.templateName);
@@ -127,7 +126,18 @@ async function findRecentRecipientFallback(
   const { data, error } = await query;
   if (error) throw error;
 
-  return data?.[0] || null;
+  const compatible = (data || []).filter((row: any) =>
+    !row.provider_message_id || row.provider_message_id === candidate.messageId
+  );
+
+  if (!compatible.length) return null;
+
+  return compatible
+    .sort((a: any, b: any) => {
+      const aDiff = Math.abs(eventAt.getTime() - new Date(a.sent_at).getTime());
+      const bDiff = Math.abs(eventAt.getTime() - new Date(b.sent_at).getTime());
+      return aDiff - bDiff;
+    })[0] || null;
 }
 
 async function applyStatus(
