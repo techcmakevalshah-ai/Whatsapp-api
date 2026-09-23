@@ -1,5 +1,5 @@
 import { supabase } from './supabase';
-import type { CampaignSummary, Contact, ManagedWhatsAppTemplate, MessageSeries, MessageSeriesScheduleSummary, MessageSeriesStep, RecipientStatus, RecurringCampaignSummary, WhatsAppTemplate } from '../types';
+import type { CampaignSummary, Contact, ManagedWhatsAppTemplate, MessageSeries, MessageSeriesScheduleSummary, MessageSeriesStep, RecipientStatus, RecurringCampaignSummary, TemplateFolder, WhatsAppTemplate } from '../types';
 
 async function json<T>(url: string, init?: RequestInit): Promise<T> {
   const headers = new Headers(init?.headers);
@@ -61,7 +61,7 @@ export function getCampaigns(): Promise<{ campaigns: CampaignSummary[] }> {
   return json('/api/campaigns');
 }
 
-export function getManagedTemplates(): Promise<{ templates: ManagedWhatsAppTemplate[] }> {
+export function getManagedTemplates(): Promise<{ templates: ManagedWhatsAppTemplate[]; folders: TemplateFolder[] }> {
   return json('/api/templates');
 }
 
@@ -73,6 +73,7 @@ export function createManagedTemplate(payload: {
   footer?: string;
   status: 'DRAFT' | 'APPROVED';
   headerType?: 'IMAGE' | 'VIDEO' | null;
+  folderId?: string | null;
   confirmProviderApproved?: boolean;
 }): Promise<{ template: ManagedWhatsAppTemplate }> {
   return json('/api/templates', { method: 'POST', body: JSON.stringify(payload) });
@@ -86,6 +87,7 @@ export function updateManagedTemplate(id: string, payload: {
   footer?: string;
   status: 'DRAFT' | 'APPROVED';
   headerType?: 'IMAGE' | 'VIDEO' | null;
+  folderId?: string | null;
   confirmProviderApproved?: boolean;
 }): Promise<{ template: ManagedWhatsAppTemplate }> {
   return json(`/api/templates?id=${encodeURIComponent(id)}`, {
@@ -223,5 +225,41 @@ export function updateMessageSeriesSchedule(
   return json(`/api/message-series?id=${encodeURIComponent(id)}`, {
     method: 'PATCH',
     body: JSON.stringify({ scope: 'schedule', action }),
+  });
+}
+
+export function createTemplateFolder(payload: {
+  name: string;
+  description?: string;
+}): Promise<{ folder: TemplateFolder }> {
+  return json('/api/templates', {
+    method: 'POST',
+    body: JSON.stringify({ scope: 'folder', ...payload }),
+  });
+}
+
+export function updateTemplateFolder(
+  id: string,
+  payload: { name: string; description?: string },
+): Promise<{ folder: TemplateFolder }> {
+  return json(`/api/templates?id=${encodeURIComponent(id)}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ scope: 'folder', ...payload }),
+  });
+}
+
+export function archiveTemplateFolder(id: string): Promise<{ ok: true }> {
+  return json(`/api/templates?scope=folder&id=${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+  });
+}
+
+export function moveManagedTemplate(
+  id: string,
+  folderId: string | null,
+): Promise<{ template: ManagedWhatsAppTemplate }> {
+  return json(`/api/templates?id=${encodeURIComponent(id)}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ scope: 'move', folderId }),
   });
 }
