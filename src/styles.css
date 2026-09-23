@@ -1000,3 +1000,63 @@ tbody tr:hover{background:#fafcff}
   .series-preview-bubble{width:96%;max-width:96%}
   .series-selection-wa-preview .message-bubble{min-width:90%}
 }
+
+
+/* Correct compact WhatsApp-style series previews */
+.series-wa-preview,
+.series-selection-wa-preview{
+  display:flex!important;
+  justify-content:flex-start!important;
+  align-items:flex-start!important;
+  min-height:0!important;
+  padding:16px!important;
+}
+
+.series-preview-bubble,
+.series-selection-wa-preview .series-preview-bubble{
+  width:min(390px,100%)!important;
+  min-width:0!important;
+  max-width:390px!important;
+  padding:8px 8px 22px!important;
+  margin:0!important;
+}
+
+.series-preview-bubble .preview-media{
+  display:block;
+  width:100%!important;
+  height:auto!important;
+  max-height:420px!important;
+  object-fit:contain!important;
+  margin:0 0 9px!important;
+  border-radius:8px!important;
+  background:#000;
+}
+
+.series-preview-bubble img.preview-media{
+  background:#f3f4f6;
+  object-fit:contain!important;
+}
+
+.series-preview-message-text{
+  white-space:normal;
+  overflow-wrap:anywhere;
+  word-break:break-word;
+  line-height:1.45;
+  padding:2px 4px 0;
+}
+
+.series-preview-message-text>div{
+  white-space:pre-wrap;
+}
+
+.series-step-preview-item{
+  align-items:flex-start!important;
+}
+
+@media(max-width:700px){
+  .series-preview-bubble,
+  .series-selection-wa-preview .series-preview-bubble{
+    width:100%!important;
+    max-width:100%!important;
+  }
+}
