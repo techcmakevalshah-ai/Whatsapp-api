@@ -3,7 +3,7 @@ import { useState, type ChangeEvent } from 'react';
 import { supabase } from '../lib/supabase';
 import type { WhatsAppTemplate } from '../types';
 
-const MAX_MEDIA_SIZE = 15 * 1024 * 1024;
+const MAX_MEDIA_SIZE = 15 * 1024 * 1024; // OfficialWA media limit
 
 function safeFileName(value: string) {
   return value.toLowerCase().replace(/[^a-z0-9._-]+/g, '-');
