@@ -1,6 +1,6 @@
 import { BarChart3, ContactRound, FolderOpen, LayoutDashboard, MessageCircle, Settings, ShieldCheck } from 'lucide-react';
 
-export type AppPage = 'whatsapp' | 'contacts' | 'users';
+export type AppPage = 'dashboard' | 'whatsapp' | 'contacts' | 'users';
 
 export function Sidebar({
   page,
@@ -20,9 +20,12 @@ export function Sidebar({
       <div className="brand"><span className="brand-mark">◎</span><span>CMA Keval Shah</span></div>
 
       <nav>
-        <div className="nav-item nav-disabled" title="Coming later">
+        <button
+          className={`nav-item nav-button ${page === 'dashboard' ? 'active' : ''}`}
+          onClick={() => onNavigate('dashboard')}
+        >
           <LayoutDashboard size={18}/><span>Dashboard</span>
-        </div>
+        </button>
 
         <button
           className={`nav-item nav-button ${page === 'contacts' ? 'active' : ''}`}
