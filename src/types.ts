@@ -124,6 +124,7 @@ export type StaffProfile = {
   email: string;
   fullName: string;
   role: 'admin' | 'staff';
+  mustSetPassword: boolean;
 };
 
 export type StaffUserProfile = StaffProfile & {
