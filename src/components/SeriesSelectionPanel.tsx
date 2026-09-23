@@ -1,16 +1,18 @@
 import { CheckCircle2, ListTree } from 'lucide-react';
-import type { MessageSeries, WhatsAppTemplate } from '../types';
+import type { Contact, MessageSeries, WhatsAppTemplate } from '../types';
 
 export function SeriesSelectionPanel({
   series,
   selectedId,
   onSelect,
   templates,
+  contact,
 }: {
   series: MessageSeries[];
   selectedId: string;
   onSelect: (id: string) => void;
   templates: WhatsAppTemplate[];
+  contact?: Contact;
 }) {
   const readySeries = series.filter((item) => item.status === 'READY');
   const selected = readySeries.find((item) => item.id === selectedId);
@@ -21,9 +23,9 @@ export function SeriesSelectionPanel({
     );
 
   const previewDynamicValues: Record<string, string> = {
-    name: 'Contact Name',
-    phone: '919876543210',
-    category: 'General',
+    name: contact?.name || 'Contact Name',
+    phone: contact?.phone || '919876543210',
+    category: contact?.category || 'General',
   };
 
   const previewDynamicValue = (value: string) =>
@@ -35,7 +37,12 @@ export function SeriesSelectionPanel({
   const renderPreviewBody = (body: string, values: Record<string, string>) =>
     String(body || '').replace(
       /\{\{\s*(\d+)\s*\}\}/g,
-      (_, key: string) => previewDynamicValue(values[key] || `{{${key}}}`),
+      (_, key: string) => {
+        const configured = String(values[key] || '').trim();
+        return configured
+          ? previewDynamicValue(configured)
+          : `Example value ${key}`;
+      },
     );
 
   return (
@@ -118,10 +125,18 @@ export function SeriesSelectionPanel({
                               {step.headerType.toLowerCase()} not uploaded
                             </div>
                           )}
-                          <div className="preview-message-text">
-                            {body || 'Template preview unavailable.'}
+                          <div className="preview-message-text series-preview-message-text">
+                            {(body || 'Template preview unavailable.')
+                              .split('\n')
+                              .map((line, lineIndex) => (
+                                <div key={lineIndex}>{line || <br/>}</div>
+                              ))}
                           </div>
-                          <small>Preview</small>
+                          <small>
+                            {contact
+                              ? `Preview for ${contact.name}`
+                              : 'Preview'}
+                          </small>
                         </div>
                       </div>
                     </div>
