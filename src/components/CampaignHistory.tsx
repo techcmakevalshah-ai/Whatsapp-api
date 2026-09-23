@@ -201,8 +201,8 @@ export function CampaignHistory({
                       </small>
                     </td>
                     <td>
-                      <span className={'pill ' + statusClass(campaign.deliveryStatus || campaign.status)}>
-                        {statusLabel(campaign.deliveryStatus || campaign.status)}
+                      <span className={'pill ' + statusClass(campaign.status)}>
+                        {statusLabel(campaign.status)}
                       </span>
                     </td>
                     <td>
@@ -364,8 +364,8 @@ export function CampaignHistory({
                     <td>{campaign.templateName}</td>
                     <td>{campaign.totalRecipients}</td>
                     <td>
-                      <span className={'pill ' + statusClass(campaign.status)}>
-                        {statusLabel(campaign.status)}
+                      <span className={'pill ' + statusClass(campaign.deliveryStatus || campaign.status)}>
+                        {statusLabel(campaign.deliveryStatus || campaign.status)}
                       </span>
                     </td>
                     <td>
