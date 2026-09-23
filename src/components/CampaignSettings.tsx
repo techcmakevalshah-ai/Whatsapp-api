@@ -1,6 +1,6 @@
-import { CalendarClock, Clock3, Repeat2, Send } from 'lucide-react';
+import { CalendarClock, Clock3, ListTree, Repeat2, Send } from 'lucide-react';
 
-export type DeliveryMode = 'now' | 'once' | 'daily';
+export type DeliveryMode = 'now' | 'once' | 'daily' | 'series';
 
 function toLocalInput(date: Date) {
   const shifted = new Date(date.getTime() - date.getTimezoneOffset() * 60_000);
@@ -78,7 +78,7 @@ export function CampaignSettings({
 
         <div className="schedule-mode-field">
           <span className="schedule-field-label">Delivery</span>
-          <div className="schedule-mode-toggle schedule-mode-three">
+          <div className="schedule-mode-toggle schedule-mode-four">
             <button
               type="button"
               className={deliveryMode === 'now' ? 'active' : ''}
@@ -100,6 +100,13 @@ export function CampaignSettings({
             >
               <Repeat2 size={14}/> Repeat Daily
             </button>
+            <button
+              type="button"
+              className={deliveryMode === 'series' ? 'active' : ''}
+              onClick={() => selectMode('series')}
+            >
+              <ListTree size={14}/> Message Series
+            </button>
           </div>
         </div>
       </div>
@@ -108,7 +115,13 @@ export function CampaignSettings({
         <div className="schedule-panel">
           <div className="schedule-input-row">
             <label>
-              <span>{deliveryMode === 'daily' ? 'First Send Date & Time' : 'Send Date & Time'}</span>
+              <span>
+                {deliveryMode === 'daily'
+                  ? 'First Send Date & Time'
+                  : deliveryMode === 'series'
+                    ? 'First Series Send Date & Time'
+                    : 'Send Date & Time'}
+              </span>
               <input
                 type="datetime-local"
                 min={minSchedule}
@@ -166,8 +179,10 @@ export function CampaignSettings({
 
           <div className="schedule-note">
             {deliveryMode === 'daily'
-              ? 'The same approved template, variables and media will be used each day. Only contacts that are still Active in Google Sheets at send time will receive that day’s message. You can pause, resume or cancel the series from Campaign History.'
-              : 'Scheduled campaigns are checked every minute. You can cancel or reschedule them from Campaign History until sending starts.'}
+              ? 'The same approved template, variables and media will be used each day. Only contacts that are still Active in Google Sheets at send time will receive that day’s message.'
+              : deliveryMode === 'series'
+                ? 'Each day uses the separate template, variables and media configured in Manage Templates → Series Messages. Only contacts still Active in Google Sheets receive that day’s message.'
+                : 'Scheduled campaigns are checked every minute. You can cancel or reschedule them from Campaign History until sending starts.'}
           </div>
         </div>
       )}
