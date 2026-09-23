@@ -28,30 +28,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(200).json({ dashboard: data || {} });
       }
 
-      let query = sb
-        .from('campaigns')
-        .select('id, name, template_name, status, scheduled_at, timezone, canceled_at, scheduler_error, created_at, campaign_recipients(count)')
-        .order('created_at', { ascending: false })
-        .limit(50);
-
-      if (user.id !== 'local-development') query = query.eq('created_by', user.id);
-
-      const { data, error } = await query;
+      const { data, error } = await sb.rpc('get_campaign_history', {
+        p_user_id: user.id === 'local-development' ? null : user.id,
+        p_is_admin: user.role === 'admin',
+        p_limit: 50,
+      });
       if (error) throw error;
 
       return res.status(200).json({
-        campaigns: (data || []).map((row: any) => ({
-          id: row.id,
-          name: row.name,
-          templateName: row.template_name,
-          status: row.status,
-          scheduledAt: row.scheduled_at,
-          timezone: row.timezone || 'UTC',
-          canceledAt: row.canceled_at,
-          schedulerError: row.scheduler_error,
-          createdAt: row.created_at,
-          totalRecipients: row.campaign_recipients?.[0]?.count || 0,
-        })),
+        campaigns: Array.isArray(data) ? data : [],
       });
     }
 
