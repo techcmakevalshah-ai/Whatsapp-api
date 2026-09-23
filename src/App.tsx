@@ -539,6 +539,7 @@ export default function App() {
                         setStatusRows([]);
                       }}
                       templates={templates}
+                      contact={chosenContacts[0]}
                     />
                   ) : (
                     <>
