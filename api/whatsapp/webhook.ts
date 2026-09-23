@@ -9,7 +9,6 @@ const STATUS_RANK: Record<string, number> = {
   Sent: 2,
   Delivered: 3,
   Read: 4,
-  Failed: 5,
 };
 
 function isoFromTimestamp(value: unknown) {
@@ -34,91 +33,101 @@ function firstString(...values: unknown[]) {
   return null;
 }
 
-function normalizeEventName(value: unknown) {
-  const raw = String(value || '').trim().toLowerCase();
-  if (!raw) return null;
-  return raw.replace(/[\s_-]+/g, ' ');
+function normalizePhone(value: unknown) {
+  return String(value || '').replace(/\D/g, '');
 }
 
-function extractPhone(body: any) {
-  return firstString(
-    body?.phone,
-    body?.from,
-    body?.to,
-    body?.wa_id,
-    body?.mobile,
-    body?.mobile_no,
-    body?.contact?.phone,
-    body?.contact?.wa_id,
-    body?.data?.phone,
-    body?.data?.from,
-    body?.data?.to,
-    body?.data?.wa_id,
-    body?.message?.from,
-    body?.message?.to,
-    body?.messages?.[0]?.from,
-    body?.contacts?.[0]?.wa_id,
-  );
+function parseCallbackData(value: unknown) {
+  if (typeof value !== 'string' || !value.trim()) return {} as Record<string, unknown>;
+  try {
+    const parsed = JSON.parse(value);
+    return parsed && typeof parsed === 'object' ? parsed as Record<string, unknown> : {};
+  } catch {
+    return {};
+  }
 }
 
 type StatusCandidate = {
   status: string;
   messageId: string | null;
+  recipientId: string | null;
+  templateName: string | null;
   timestamp: unknown;
   error: string | null;
 };
 
-function collectStatusCandidates(value: unknown, output: StatusCandidate[], depth = 0) {
-  if (depth > 8 || value == null) return;
+function collectMetaStatusCandidates(body: any) {
+  const output: StatusCandidate[] = [];
 
-  if (Array.isArray(value)) {
-    for (const item of value) collectStatusCandidates(item, output, depth + 1);
-    return;
-  }
+  for (const entry of body?.entry || []) {
+    for (const change of entry?.changes || []) {
+      for (const status of change?.value?.statuses || []) {
+        const normalizedStatus = String(status?.status || '').trim().toLowerCase();
+        if (!ALLOWED_STATUSES.has(normalizedStatus)) continue;
 
-  if (typeof value !== 'object') return;
-
-  const object = value as Record<string, any>;
-  const normalizedStatus = String(
-    object.status ?? object.message_status ?? object.delivery_status ?? object.event ?? object.type ?? '',
-  ).trim().toLowerCase();
-
-  if (ALLOWED_STATUSES.has(normalizedStatus)) {
-    const messageId = firstString(
-      object.id,
-      object.message_id,
-      object.messageId,
-      object.msg_id,
-      object.wa_message_id,
-      object.wamid,
-      object.message?.id,
-      object.data?.id,
-      object.data?.message_id,
-      object.data?.messageId,
-    );
-
-    const error = firstString(
-      object.error,
-      object.error_message,
-      object.errors?.[0]?.title,
-      object.errors?.[0]?.message,
-      object.reason,
-      object.data?.error,
-    );
-
-    output.push({
-      status: normalizedStatus,
-      messageId,
-      timestamp: object.timestamp ?? object.time ?? object.created_at ?? object.updated_at,
-      error,
-    });
-  }
-
-  for (const child of Object.values(object)) {
-    if (child && typeof child === 'object') {
-      collectStatusCandidates(child, output, depth + 1);
+        const callbackData = parseCallbackData(status?.biz_opaque_callback_data);
+        output.push({
+          status: normalizedStatus,
+          messageId: firstString(status?.id),
+          recipientId: firstString(status?.recipient_id, change?.value?.contacts?.[0]?.wa_id),
+          templateName: firstString(callbackData?.template),
+          timestamp: status?.timestamp,
+          error: firstString(
+            status?.errors?.[0]?.title,
+            status?.errors?.[0]?.message,
+            status?.error,
+          ),
+        });
+      }
     }
   }
+
+  return output;
+}
+
+async function findRecipientByMessageId(
+  sb: ReturnType<typeof supabaseAdmin>,
+  messageId: string,
+) {
+  const { data, error } = await sb
+    .from('campaign_recipients')
+    .select('id, status, provider_message_id, sent_at')
+    .eq('provider_message_id', messageId)
+    .maybeSingle();
+
+  if (error) throw error;
+  return data;
+}
+
+async function findRecentRecipientFallback(
+  sb: ReturnType<typeof supabaseAdmin>,
+  candidate: StatusCandidate,
+) {
+  const phone = normalizePhone(candidate.recipientId);
+  if (!phone) return null;
+
+  const eventAt = new Date(isoFromTimestamp(candidate.timestamp));
+  const earliest = new Date(eventAt.getTime() - 6 * 60 * 60 * 1000).toISOString();
+
+  let query = sb
+    .from('campaign_recipients')
+    .select('id, status, provider_message_id, sent_at, campaign:campaigns!inner(template_name)')
+    .eq('phone', phone)
+    .is('provider_message_id', null)
+    .not('sent_at', 'is', null)
+    .gte('sent_at', earliest)
+    .lte('sent_at', eventAt.toISOString())
+    .order('sent_at', { ascending: false })
+    .limit(5);
+
+  if (candidate.templateName) {
+    query = query.eq('campaign.template_name', candidate.templateName);
+  }
+
+  const { data, error } = await query;
+  if (error) throw error;
+
+  return data?.[0] || null;
 }
 
 async function applyStatus(
@@ -129,32 +138,36 @@ async function applyStatus(
     return { matched: false, note: 'Status event had no message id.' };
   }
 
-  const { data: recipient, error: lookupError } = await sb
-    .from('campaign_recipients')
-    .select('id, status')
-    .eq('provider_message_id', candidate.messageId)
-    .maybeSingle();
+  let recipient = await findRecipientByMessageId(sb, candidate.messageId);
+  let linkedByFallback = false;
 
-  if (lookupError) throw lookupError;
   if (!recipient) {
-    return { matched: false, note: 'No campaign recipient matched the provider message id.' };
+    recipient = await findRecentRecipientFallback(sb, candidate);
+    linkedByFallback = Boolean(recipient);
+  }
+
+  if (!recipient) {
+    return {
+      matched: false,
+      note: 'No campaign recipient matched message id or recent phone/template fallback.',
+    };
   }
 
   const currentStatus = String(recipient.status || '');
   const timestamp = isoFromTimestamp(candidate.timestamp);
   const update: Record<string, unknown> = {};
 
+  if (!recipient.provider_message_id) {
+    update.provider_message_id = candidate.messageId;
+  }
+
   if (candidate.status === 'sent') {
-    if ((STATUS_RANK[currentStatus] ?? 0) <= STATUS_RANK.Sent) {
-      update.status = 'Sent';
-    }
-    update.sent_at = timestamp;
+    if ((STATUS_RANK[currentStatus] ?? 0) <= STATUS_RANK.Sent) update.status = 'Sent';
+    update.sent_at = recipient.sent_at || timestamp;
   }
 
   if (candidate.status === 'delivered') {
-    if ((STATUS_RANK[currentStatus] ?? 0) <= STATUS_RANK.Delivered) {
-      update.status = 'Delivered';
-    }
+    if ((STATUS_RANK[currentStatus] ?? 0) <= STATUS_RANK.Delivered) update.status = 'Delivered';
     update.delivered_at = timestamp;
   }
 
@@ -170,17 +183,17 @@ async function applyStatus(
     }
   }
 
-  if (!Object.keys(update).length) {
-    return { matched: true, note: 'Event matched but did not advance status.' };
-  }
-
   const { error: updateError } = await sb
     .from('campaign_recipients')
     .update(update)
     .eq('id', recipient.id);
 
   if (updateError) throw updateError;
-  return { matched: true, note: `Updated recipient to ${String(update.status || currentStatus)}.` };
+
+  return {
+    matched: true,
+    note: `${linkedByFallback ? 'Linked wamid using phone/template/time fallback. ' : ''}Updated recipient to ${String(update.status || currentStatus)}.`,
+  };
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -206,51 +219,31 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   try {
     const body = req.body && typeof req.body === 'object' ? req.body : {};
-    const candidates: StatusCandidate[] = [];
-    collectStatusCandidates(body, candidates);
-
-    const eventType = normalizeEventName(
-      body?.event ??
-      body?.event_type ??
-      body?.type ??
-      body?.status ??
-      body?.action ??
-      candidates[0]?.status,
-    );
-
-    const providerMessageId =
-      candidates.find((item) => item.messageId)?.messageId ??
-      firstString(body?.message_id, body?.messageId, body?.id, body?.data?.message_id);
-
-    const phone = extractPhone(body);
+    const candidates = collectMetaStatusCandidates(body);
     const sb = supabaseAdmin();
-
-    const uniqueCandidates = candidates.filter((candidate, index, all) =>
-      all.findIndex((item) =>
-        item.status === candidate.status &&
-        item.messageId === candidate.messageId
-      ) === index
-    );
 
     const processingNotes: string[] = [];
     let processed = false;
 
-    for (const candidate of uniqueCandidates) {
+    for (const candidate of candidates) {
       const result = await applyStatus(sb, candidate);
       processingNotes.push(`${candidate.status}: ${result.note}`);
       processed = processed || result.matched;
     }
 
+    const first = candidates[0];
+    const firstValue = body?.entry?.[0]?.changes?.[0]?.value;
+
     const { error: logError } = await sb
       .from('officialwa_webhook_events')
       .insert({
         id: crypto.randomUUID(),
-        event_type: eventType,
-        provider_message_id: providerMessageId,
-        phone,
+        event_type: first?.status || body?.entry?.[0]?.changes?.[0]?.field || null,
+        provider_message_id: first?.messageId || null,
+        phone: normalizePhone(first?.recipientId || firstValue?.contacts?.[0]?.wa_id) || null,
         payload: body,
         processed,
-        process_note: processingNotes.join(' | ').slice(0, 1500) || 'Captured for payload mapping.',
+        process_note: processingNotes.join(' | ').slice(0, 1500) || 'Captured webhook event.',
       });
 
     if (logError) throw logError;
@@ -258,7 +251,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(200).json({
       ok: true,
       received: true,
-      statusEventsFound: uniqueCandidates.length,
+      statusEventsFound: candidates.length,
       matchedExistingMessage: processed,
     });
   } catch (error) {
