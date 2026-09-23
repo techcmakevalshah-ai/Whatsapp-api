@@ -630,6 +630,7 @@ export default function App() {
       <TemplateManager
         open={templateManagerOpen}
         onClose={() => setTemplateManagerOpen(false)}
+        isAdmin={profile?.role === 'admin'}
         onChanged={async () => {
           await refreshTemplates();
           await refreshMessageSeries();
