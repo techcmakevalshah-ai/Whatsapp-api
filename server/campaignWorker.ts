@@ -45,17 +45,24 @@ export async function processCampaignBatch(campaignId: string, limit = 20) {
         mediaUrl: campaign.media_url,
       });
       const sentAt = new Date().toISOString();
+      const recipientStatus = sent.queued ? 'Processing' : 'Sent';
       const { error } = await sb
         .from('campaign_recipients')
         .update({
-          status: 'Sent',
+          status: recipientStatus,
           provider_message_id: sent.messageId || null,
-          sent_at: sentAt,
+          sent_at: sent.queued ? null : sentAt,
           error_message: null,
         })
         .eq('id', row.id);
       if (error) throw error;
-      results.push({ id: row.id, name: row.name, phone: row.phone, status: 'Sent', sentAt });
+      results.push({
+        id: row.id,
+        name: row.name,
+        phone: row.phone,
+        status: recipientStatus,
+        sentAt: sent.queued ? null : sentAt,
+      });
     } catch (error) {
       const message =
         error instanceof Error
