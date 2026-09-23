@@ -3,7 +3,7 @@ import { useState, type ChangeEvent } from 'react';
 import { supabase } from '../lib/supabase';
 import type { WhatsAppTemplate } from '../types';
 
-const MAX_MEDIA_SIZE = 100 * 1024 * 1024;
+const MAX_MEDIA_SIZE = 15 * 1024 * 1024;
 
 function safeFileName(value: string) {
   return value.toLowerCase().replace(/[^a-z0-9._-]+/g, '-');
@@ -42,7 +42,7 @@ export function TemplatePanel({ templates, selectedId, onSelect, variableValues,
         throw new Error('This template requires a video file.');
       }
       if (file.size > MAX_MEDIA_SIZE) {
-        throw new Error('File is too large. Maximum upload size is 100 MB.');
+        throw new Error('File is too large. Maximum upload size is 15 MB.');
       }
 
       const ext = file.name.includes('.') ? file.name.split('.').pop() : '';
@@ -112,7 +112,7 @@ export function TemplatePanel({ templates, selectedId, onSelect, variableValues,
         <div className="media-upload-card">
           <div className="media-label">
             {selected?.headerType} Header
-            <span>Upload the media approved for this campaign template · max 100 MB</span>
+            <span>Upload the media approved for this campaign template · max 15 MB</span>
           </div>
 
           <label className="media-upload-button">
