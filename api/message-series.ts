@@ -465,6 +465,58 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const id = String(req.query.id || '').trim();
       if (!id) return res.status(400).json({ error: 'Message series id is required.' });
 
+      const permanent = String(req.query.permanent || '') === '1';
+
+      if (permanent) {
+        if (user.role !== 'admin') {
+          return res.status(403).json({ error: 'Administrator access is required for permanent deletion.' });
+        }
+
+        const { data: series, error: seriesError } = await sb
+          .from('message_series')
+          .select('id, name, created_by')
+          .eq('id', id)
+          .maybeSingle();
+
+        if (seriesError) throw seriesError;
+        if (!series) return res.status(404).json({ error: 'Message series not found.' });
+
+        const { count: scheduleCount, error: scheduleError } = await sb
+          .from('message_series_schedules')
+          .select('id', { count: 'exact', head: true })
+          .eq('series_id', id);
+
+        if (scheduleError) throw scheduleError;
+
+        if ((scheduleCount || 0) > 0) {
+          return res.status(409).json({
+            error: 'This series has schedule/history records and cannot be permanently deleted. Disable it instead so history remains intact.',
+          });
+        }
+
+        const { error: deleteError } = await sb
+          .from('message_series')
+          .delete()
+          .eq('id', id);
+
+        if (deleteError) throw deleteError;
+
+        if (user.id !== 'local-development') {
+          await sb.from('staff_access_audit').insert({
+            actor_user_id: user.id,
+            target_user_id: null,
+            action: 'permanent_delete_message_series',
+            metadata: {
+              seriesId: id,
+              seriesName: series.name,
+              createdBy: series.created_by,
+            },
+          });
+        }
+
+        return res.status(200).json({ ok: true, status: 'deleted' });
+      }
+
       let query = sb
         .from('message_series')
         .update({ status: 'INACTIVE', updated_at: new Date().toISOString() })
@@ -475,7 +527,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const { error } = await query;
       if (error) throw error;
 
-      return res.status(200).json({ ok: true });
+      return res.status(200).json({ ok: true, status: 'disabled' });
     }
 
     return res.status(405).json({ error: 'Method not allowed' });
