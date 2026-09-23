@@ -288,7 +288,8 @@ export function updateStaffUser(
   payload:
     | { action: 'revoke' }
     | { action: 'reactivate' }
-    | { action: 'update_profile'; fullName: string; role: 'admin' | 'staff' },
+    | { action: 'update_profile'; fullName: string; role: 'admin' | 'staff' }
+    | { action: 'delete_user'; primaryAdminPassword: string },
 ): Promise<{ ok: true; status?: string }> {
   return json(`/api/users?id=${encodeURIComponent(id)}`, {
     method: 'PATCH',
