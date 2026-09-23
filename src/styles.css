@@ -866,3 +866,55 @@ tbody tr:hover{background:#fafcff}
   .dashboard-panel-head{flex-direction:column}
   .dashboard-legend{align-self:flex-start}
 }
+
+
+/* Campaign history delivery breakdown */
+.history-delivery-summary{
+  display:grid;
+  grid-template-columns:repeat(6,minmax(0,1fr));
+  gap:10px;
+  margin:0 0 12px;
+}
+.history-delivery-summary>div{
+  background:#fff;
+  border:1px solid #e3e8ef;
+  border-radius:10px;
+  padding:10px 12px;
+  display:flex;
+  flex-direction:column;
+  gap:3px;
+  box-shadow:0 1px 2px rgba(15,23,42,.02);
+}
+.history-delivery-summary span{
+  font-size:8px;
+  color:#7c899b;
+  text-transform:uppercase;
+  letter-spacing:.045em;
+  font-weight:800;
+}
+.history-delivery-summary b{
+  font-size:18px;
+  color:#17283f;
+  letter-spacing:-.02em;
+}
+.history-count{
+  display:inline-flex;
+  min-width:28px;
+  justify-content:center;
+  padding:4px 8px;
+  border-radius:999px;
+  font-weight:800;
+  font-size:10px;
+}
+.history-count.sent{background:#eef3ff;color:#315cc9}
+.history-count.delivered{background:#e8f8ed;color:#18733a}
+.history-count.read{background:#eaf2ff;color:#1d4ed8}
+.history-count.failed{background:#fff0ef;color:#b42318}
+.campaign-history-table{max-width:100%;overflow:auto}
+.campaign-history-table table{min-width:1320px}
+@media(max-width:900px){
+  .history-delivery-summary{grid-template-columns:repeat(3,1fr)}
+}
+@media(max-width:600px){
+  .history-delivery-summary{grid-template-columns:repeat(2,1fr)}
+}
