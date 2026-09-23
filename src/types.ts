@@ -71,3 +71,40 @@ export type RecurringCampaignSummary = {
   createdAt: string;
   totalRecipients: number;
 };
+
+export type MessageSeriesStep = {
+  id?: string;
+  dayNumber: number;
+  templateName: string;
+  templateLanguage: string;
+  headerType?: 'IMAGE' | 'VIDEO' | null;
+  mediaUrl?: string | null;
+  variableValues: Record<string, string>;
+};
+
+export type MessageSeries = {
+  id: string;
+  name: string;
+  description?: string | null;
+  status: 'READY' | 'INACTIVE' | string;
+  createdAt: string;
+  updatedAt: string;
+  steps: MessageSeriesStep[];
+};
+
+export type MessageSeriesScheduleSummary = {
+  id: string;
+  seriesId: string;
+  seriesName: string;
+  name: string;
+  status: 'active' | 'paused' | 'completed' | 'canceled' | string;
+  timezone: string;
+  startAt: string;
+  nextRunAt?: string | null;
+  totalDays: number;
+  runsCreated: number;
+  lastRunAt?: string | null;
+  schedulerError?: string | null;
+  createdAt: string;
+  totalRecipients: number;
+};
