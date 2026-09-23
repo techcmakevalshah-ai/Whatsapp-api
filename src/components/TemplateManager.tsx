@@ -1,4 +1,4 @@
-import { Ban, Pencil, Plus, X } from 'lucide-react';
+import { Ban, ListTree, MessageSquareText, Pencil, Plus, X } from 'lucide-react';
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import {
   createManagedTemplate,
@@ -7,6 +7,7 @@ import {
   updateManagedTemplate,
 } from '../lib/api';
 import type { ManagedWhatsAppTemplate } from '../types';
+import { SeriesManager } from './SeriesManager';
 
 type FormState = {
   id: string;
@@ -47,6 +48,7 @@ export function TemplateManager({
   onChanged: () => void | Promise<void>;
 }) {
   const [templates, setTemplates] = useState<ManagedWhatsAppTemplate[]>([]);
+  const [activeTab, setActiveTab] = useState<'templates' | 'series'>('templates');
   const [form, setForm] = useState<FormState>(emptyForm);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -139,20 +141,37 @@ export function TemplateManager({
       <section className="template-manager" onMouseDown={(event) => event.stopPropagation()}>
         <div className="modal-head">
           <div>
-            <h2>Message Templates</h2>
-            <p>Add templates that have already been created in OfficialWA.</p>
+            <h2>Message Templates & Series</h2>
+            <p>Manage approved OfficialWA templates and build multi-day message series.</p>
           </div>
           <button className="icon-btn" onClick={onClose}><X size={20}/></button>
         </div>
 
-        <div className="template-notice">
-          <b>Approval note:</b> marking a template Approved here does not submit it to WhatsApp.
-          Use Approved only after OfficialWA has approved the exact template name, language and text.
+        <div className="template-manager-tabs">
+          <button
+            className={activeTab === 'templates' ? 'active' : ''}
+            onClick={() => setActiveTab('templates')}
+          >
+            <MessageSquareText size={16}/> Approved Templates
+          </button>
+          <button
+            className={activeTab === 'series' ? 'active' : ''}
+            onClick={() => setActiveTab('series')}
+          >
+            <ListTree size={16}/> Series Messages
+          </button>
         </div>
 
-        {error && <div className="alert">{error}</div>}
+        {activeTab === 'templates' ? (
+          <>
+            <div className="template-notice">
+              <b>Approval note:</b> marking a template Approved here does not submit it to WhatsApp.
+              Use Approved only after OfficialWA has approved the exact template name, language and text.
+            </div>
 
-        <div className="template-manager-grid">
+            {error && <div className="alert">{error}</div>}
+
+            <div className="template-manager-grid">
           <form className="template-form" onSubmit={save}>
             <div className="template-form-head">
               <div>
@@ -312,7 +331,14 @@ export function TemplateManager({
               <div className="empty-state">No templates saved yet.</div>
             )}
           </div>
-        </div>
+            </div>
+          </>
+        ) : (
+          <SeriesManager
+            templates={templates}
+            onSeriesChanged={onChanged}
+          />
+        )}
       </section>
     </div>
   );
