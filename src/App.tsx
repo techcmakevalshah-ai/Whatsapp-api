@@ -57,6 +57,7 @@ export default function App() {
   const [loadingTemplates, setLoadingTemplates] = useState(false);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState('');
+  const [seriesScheduleSuccess, setSeriesScheduleSuccess] = useState('');
   const [contactError, setContactError] = useState('');
   const [templateError, setTemplateError] = useState('');
   const [statusRows, setStatusRows] = useState<RecipientStatus[]>([]);
@@ -243,6 +244,7 @@ export default function App() {
   });
 
   const send = async () => {
+    setSeriesScheduleSuccess('');
     if (!campaignName.trim()) return setError('Enter a campaign name.');
     if (!chosenContacts.length) return setError('Select at least one active contact.');
 
@@ -265,6 +267,9 @@ export default function App() {
         setMessageSeriesSchedules(schedulesData.schedules);
         setCampaignId('');
         setStatusRows([]);
+        setSeriesScheduleSuccess(
+          `"${campaignName.trim()}" is scheduled successfully. Check Campaign History to view and manage the message series.`,
+        );
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Unable to schedule message series.');
       } finally {
@@ -487,6 +492,22 @@ export default function App() {
               </div>
 
               {error && <div className="alert">{error}</div>}
+
+              {seriesScheduleSuccess && (
+                <div className="series-schedule-success" role="status" aria-live="polite">
+                  <div>
+                    <b>Message series scheduled</b>
+                    <span>{seriesScheduleSuccess}</span>
+                  </div>
+                  <button
+                    type="button"
+                    className="series-schedule-history-link"
+                    onClick={() => void openHistory()}
+                  >
+                    View Campaign History →
+                  </button>
+                </div>
+              )}
 
               <div className="progress">
                 {[['1','Select Contacts'],['2','Choose Content'],['3','Compose & Preview'],['4','Send & Track']]
