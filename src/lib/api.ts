@@ -1,5 +1,5 @@
 import { supabase } from './supabase';
-import type { CampaignSummary, Contact, ManagedWhatsAppTemplate, MessageSeries, MessageSeriesScheduleSummary, MessageSeriesStep, RecipientStatus, RecurringCampaignSummary, StaffProfile, StaffUserProfile, TemplateFolder, WhatsAppTemplate } from '../types';
+import type { CampaignSummary, Contact, DashboardStats, ManagedWhatsAppTemplate, MessageSeries, MessageSeriesScheduleSummary, MessageSeriesStep, RecipientStatus, RecurringCampaignSummary, StaffProfile, StaffUserProfile, TemplateFolder, WhatsAppTemplate } from '../types';
 
 async function json<T>(url: string, init?: RequestInit): Promise<T> {
   const headers = new Headers(init?.headers);
@@ -59,6 +59,10 @@ export function getCampaignStatus(campaignId: string): Promise<{
 
 export function getCampaigns(): Promise<{ campaigns: CampaignSummary[] }> {
   return json('/api/campaigns');
+}
+
+export function getDashboardStats(): Promise<{ dashboard: DashboardStats }> {
+  return json('/api/campaigns?view=dashboard');
 }
 
 export function getManagedTemplates(): Promise<{ templates: ManagedWhatsAppTemplate[]; folders: TemplateFolder[] }> {
