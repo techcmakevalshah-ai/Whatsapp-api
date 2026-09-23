@@ -12,15 +12,16 @@ import type { ManagedWhatsAppTemplate, MessageSeries, MessageSeriesStep } from '
 type EditableStep = MessageSeriesStep & { uploading?: boolean; uploadError?: string };
 
 const MAX_MEDIA_SIZE = 100 * 1024 * 1024;
+const PREVIEW_DYNAMIC_VALUES: Record<string, string> = {
+  name: 'Contact Name',
+  phone: '919876543210',
+  category: 'General',
+};
 
 function previewDynamicValue(value: string) {
   return String(value || '').replace(
     /\{\{\s*(name|phone|category)\s*\}\}/gi,
-    (_, key: string) => ({
-      name: 'Contact Name',
-      phone: '919876543210',
-      category: 'General',
-    }[key.toLowerCase()] || ''),
+    (_, key: string) => PREVIEW_DYNAMIC_VALUES[key.toLowerCase()] || '',
   );
 }
 
