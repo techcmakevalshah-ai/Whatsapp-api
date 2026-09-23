@@ -11,6 +11,26 @@ import type { ManagedWhatsAppTemplate, MessageSeries, MessageSeriesStep } from '
 
 type EditableStep = MessageSeriesStep & { uploading?: boolean; uploadError?: string };
 
+const MAX_MEDIA_SIZE = 100 * 1024 * 1024;
+
+function previewDynamicValue(value: string) {
+  return String(value || '').replace(
+    /\{\{\s*(name|phone|category)\s*\}\}/gi,
+    (_, key: string) => ({
+      name: 'Contact Name',
+      phone: '919876543210',
+      category: 'General',
+    }[key.toLowerCase()] || ''),
+  );
+}
+
+function renderPreviewBody(body: string, values: Record<string, string>) {
+  return String(body || '').replace(
+    /\{\{\s*(\d+)\s*\}\}/g,
+    (_, key: string) => previewDynamicValue(values[key] || `{{${key}}}`),
+  );
+}
+
 function emptyStep(dayNumber: number): EditableStep {
   return {
     dayNumber,
@@ -150,8 +170,8 @@ export function SeriesManager({
       if (template.headerType === 'VIDEO' && !file.type.startsWith('video/')) {
         throw new Error('This template requires a video file.');
       }
-      if (file.size > 16 * 1024 * 1024) {
-        throw new Error('File is too large. Maximum upload size is 16 MB.');
+      if (file.size > MAX_MEDIA_SIZE) {
+        throw new Error('File is too large. Maximum upload size is 100 MB.');
       }
 
       const ext = file.name.includes('.') ? file.name.split('.').pop() : '';
@@ -391,7 +411,7 @@ export function SeriesManager({
                           <span>
                             {step.uploading
                               ? 'Uploading…'
-                              : `Upload ${selectedTemplate.headerType === 'IMAGE' ? 'Image' : 'Video'}`}
+                              : `Upload ${selectedTemplate.headerType === 'IMAGE' ? 'Image' : 'Video'} · max 100 MB`}
                           </span>
                           <input
                             hidden
@@ -416,6 +436,44 @@ export function SeriesManager({
                         {step.uploadError && <div className="inline-error">{step.uploadError}</div>}
                       </div>
                     )}
+
+                    <div className="series-live-preview">
+                      <div className="series-live-preview-head">
+                        <b>Message Preview</b>
+                        <small>Day {step.dayNumber}</small>
+                      </div>
+                      <div className="wa-bg series-wa-preview">
+                        <div className="message-bubble preview-bubble series-preview-bubble">
+                          {step.mediaUrl && selectedTemplate.headerType === 'IMAGE' && (
+                            <img
+                              className="preview-media"
+                              src={step.mediaUrl}
+                              alt={`Day ${step.dayNumber} preview`}
+                            />
+                          )}
+                          {step.mediaUrl && selectedTemplate.headerType === 'VIDEO' && (
+                            <video
+                              className="preview-media"
+                              src={step.mediaUrl}
+                              controls
+                              preload="metadata"
+                            />
+                          )}
+                          {selectedTemplate.headerType && !step.mediaUrl && (
+                            <div className="preview-media-placeholder">
+                              Upload the {selectedTemplate.headerType.toLowerCase()} to preview it here.
+                            </div>
+                          )}
+                          <div className="preview-message-text">
+                            {renderPreviewBody(selectedTemplate.body, step.variableValues)}
+                          </div>
+                          {selectedTemplate.footer && (
+                            <div className="series-preview-footer">{selectedTemplate.footer}</div>
+                          )}
+                          <small>Preview</small>
+                        </div>
+                      </div>
+                    </div>
                   </>
                 )}
               </article>
