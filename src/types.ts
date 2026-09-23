@@ -137,3 +137,40 @@ export type StaffUserProfile = StaffProfile & {
   lastSignInAt?: string | null;
   authStatus: 'invited' | 'registered' | string;
 };
+
+
+export type DashboardDailyPoint = {
+  day: string;
+  sent: number;
+  delivered: number;
+  read: number;
+  failed: number;
+};
+
+export type DashboardRecentCampaign = {
+  id: string;
+  name: string;
+  templateName: string;
+  status: string;
+  createdAt: string;
+  scheduledAt?: string | null;
+  totalRecipients: number;
+  sent: number;
+  delivered: number;
+  read: number;
+  failed: number;
+};
+
+export type DashboardStats = {
+  campaignsTotal: number;
+  messagesTotal: number;
+  sent: number;
+  delivered: number;
+  read: number;
+  failed: number;
+  scheduled: number;
+  activeRecurring: number;
+  activeSeries: number;
+  daily: DashboardDailyPoint[];
+  recentCampaigns: DashboardRecentCampaign[];
+};
