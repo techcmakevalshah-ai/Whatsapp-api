@@ -6,6 +6,7 @@ export type StaffUser = {
   email?: string | null;
   fullName?: string | null;
   role: 'admin' | 'staff';
+  mustSetPassword: boolean;
 };
 
 export async function requireStaff(req: VercelRequest, res: VercelResponse): Promise<StaffUser | null> {
@@ -16,6 +17,7 @@ export async function requireStaff(req: VercelRequest, res: VercelResponse): Pro
         email: 'local@development.test',
         fullName: 'Local Development',
         role: 'admin',
+        mustSetPassword: false,
       };
     }
 
@@ -38,7 +40,7 @@ export async function requireStaff(req: VercelRequest, res: VercelResponse): Pro
 
     const { data: staff, error: staffError } = await sb
       .from('staff_users')
-      .select('user_id, email, full_name, role, active')
+      .select('user_id, email, full_name, role, active, must_set_password')
       .eq('user_id', user.id)
       .eq('active', true)
       .maybeSingle();
@@ -57,6 +59,7 @@ export async function requireStaff(req: VercelRequest, res: VercelResponse): Pro
       email: staff.email || user.email,
       fullName: staff.full_name || null,
       role: staff.role === 'admin' ? 'admin' : 'staff',
+      mustSetPassword: staff.must_set_password === true,
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Server authentication configuration failed.';
