@@ -29,6 +29,7 @@ export default function App() {
     email: 'local@development.test',
     fullName: 'Local Development',
     role: 'admin',
+    mustSetPassword: false,
   });
   const [profileError, setProfileError] = useState('');
   const [inviteMode, setInviteMode] = useState(() => {
@@ -358,7 +359,7 @@ export default function App() {
   if (!authReady || (session && !profileReady)) return <div className="app-loading">Loading…</div>;
   if (supabase && !session) return <Login />;
 
-  if (session && inviteMode) {
+  if (session && (inviteMode || profile?.mustSetPassword)) {
     return <InvitePasswordSetup onComplete={() => setInviteMode(false)} />;
   }
 
