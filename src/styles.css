@@ -1279,3 +1279,21 @@ tbody tr:hover{background:#fafcff}
     flex-direction:column;
   }
 }
+
+
+.series-schedule-success-row{
+  display:grid;
+  grid-template-columns:.38fr .62fr;
+  gap:10px;
+}
+.series-schedule-success-row .series-schedule-success{
+  margin-bottom:0;
+}
+@media(max-width:700px){
+  .series-schedule-success-row{
+    grid-template-columns:1fr;
+  }
+  .series-schedule-success-row>div:first-child{
+    display:none;
+  }
+}
