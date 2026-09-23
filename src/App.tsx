@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import { Bell, ChevronDown, History, LogOut, Send } from 'lucide-react';
 import { Sidebar, type AppPage } from './components/Sidebar';
+import { Dashboard } from './components/Dashboard';
 import { GoogleSheetCard } from './components/GoogleSheetCard';
 import { ContactsTable } from './components/ContactsTable';
 import { ContactsManager } from './components/ContactsManager';
@@ -16,9 +17,9 @@ import { TestMessageDialog } from './components/TestMessageDialog';
 import { SeriesSelectionPanel } from './components/SeriesSelectionPanel';
 import { UserManagement } from './components/UserManagement';
 import { InvitePasswordSetup } from './components/InvitePasswordSetup';
-import { cancelCampaign, getCampaigns, getCampaignStatus, getContacts, getCurrentStaffProfile, getMessageSeries, getMessageSeriesSchedules, getRecurringCampaigns, getStaffUsers, getTemplates, rescheduleCampaign, scheduleMessageSeries, sendCampaign, updateMessageSeriesSchedule, updateRecurringCampaign } from './lib/api';
+import { cancelCampaign, getCampaigns, getCampaignStatus, getContacts, getCurrentStaffProfile, getDashboardStats, getMessageSeries, getMessageSeriesSchedules, getRecurringCampaigns, getStaffUsers, getTemplates, rescheduleCampaign, scheduleMessageSeries, sendCampaign, updateMessageSeriesSchedule, updateRecurringCampaign } from './lib/api';
 import { supabase } from './lib/supabase';
-import type { CampaignSummary, Contact, MessageSeries, MessageSeriesScheduleSummary, RecipientStatus, RecurringCampaignSummary, StaffProfile, StaffUserProfile, WhatsAppTemplate } from './types';
+import type { CampaignSummary, Contact, DashboardStats, MessageSeries, MessageSeriesScheduleSummary, RecipientStatus, RecurringCampaignSummary, StaffProfile, StaffUserProfile, WhatsAppTemplate } from './types';
 
 export default function App() {
   const [session, setSession] = useState<Session | null>(null);
@@ -37,7 +38,7 @@ export default function App() {
     return new URLSearchParams(window.location.search).get('invite') === '1'
       || window.location.hash.includes('type=invite');
   });
-  const [page, setPage] = useState<AppPage>('whatsapp');
+  const [page, setPage] = useState<AppPage>('dashboard');
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [templates, setTemplates] = useState<WhatsAppTemplate[]>([]);
   const [messageSeries, setMessageSeries] = useState<MessageSeries[]>([]);
@@ -71,6 +72,9 @@ export default function App() {
   const [staffUsers, setStaffUsers] = useState<StaffUserProfile[]>([]);
   const [usersLoading, setUsersLoading] = useState(false);
   const [usersError, setUsersError] = useState('');
+  const [dashboardStats, setDashboardStats] = useState<DashboardStats | null>(null);
+  const [dashboardLoading, setDashboardLoading] = useState(false);
+  const [dashboardError, setDashboardError] = useState('');
 
   const chosenContacts = useMemo(
     () => contacts.filter((contact) => selected.has(contact.id)),
@@ -169,6 +173,19 @@ export default function App() {
     }
   };
 
+  const refreshDashboard = async () => {
+    setDashboardLoading(true);
+    setDashboardError('');
+    try {
+      const data = await getDashboardStats();
+      setDashboardStats(data.dashboard);
+    } catch (err) {
+      setDashboardError(err instanceof Error ? err.message : 'Unable to load dashboard analytics.');
+    } finally {
+      setDashboardLoading(false);
+    }
+  };
+
   const refreshStaffUsers = async () => {
     if (profile?.role !== 'admin') return;
     setUsersLoading(true);
@@ -191,6 +208,9 @@ export default function App() {
   }, [authReady, profileReady, session?.user.id, profile?.id]);
 
   useEffect(() => {
+    if (page === 'dashboard') {
+      void refreshDashboard();
+    }
     if (page === 'users' && profile?.role === 'admin') {
       void refreshStaffUsers();
     }
@@ -391,11 +411,11 @@ export default function App() {
         <header className="topbar">
           <div>
             <span>
-              {page === 'contacts' ? 'Contacts' : page === 'users' ? 'Administration' : 'Campaigns'}
+              {page === 'dashboard' ? 'Overview' : page === 'contacts' ? 'Contacts' : page === 'users' ? 'Administration' : 'Campaigns'}
             </span>
             <b>›</b>
             <span>
-              {page === 'contacts' ? 'Google Sheet' : page === 'users' ? 'Users & Access' : 'New Campaign'}
+              {page === 'dashboard' ? 'Dashboard' : page === 'contacts' ? 'Google Sheet' : page === 'users' ? 'Users & Access' : 'New Campaign'}
             </span>
           </div>
           <div className="user">
@@ -426,7 +446,18 @@ export default function App() {
         </header>
 
         <div className="content">
-          {page === 'users' && profile?.role === 'admin' ? (
+          {page === 'dashboard' ? (
+            <Dashboard
+              stats={dashboardStats}
+              contacts={contacts}
+              templates={templates}
+              loading={dashboardLoading}
+              error={dashboardError}
+              onRefresh={refreshDashboard}
+              onNewCampaign={() => setPage('whatsapp')}
+              onHistory={openHistory}
+            />
+          ) : page === 'users' && profile?.role === 'admin' ? (
             <UserManagement
               currentProfile={profile}
               users={staffUsers}
