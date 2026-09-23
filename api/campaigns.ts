@@ -19,6 +19,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   try {
     if (req.method === 'GET') {
+      if (String(req.query.view || '').toLowerCase() === 'dashboard') {
+        const { data, error } = await sb.rpc('get_dashboard_stats', {
+          p_user_id: user.id === 'local-development' ? null : user.id,
+          p_is_admin: user.role === 'admin',
+        });
+        if (error) throw error;
+        return res.status(200).json({ dashboard: data || {} });
+      }
+
       let query = sb
         .from('campaigns')
         .select('id, name, template_name, status, scheduled_at, timezone, canceled_at, scheduler_error, created_at, campaign_recipients(count)')
