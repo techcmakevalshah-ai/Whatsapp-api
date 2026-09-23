@@ -295,3 +295,10 @@ export function updateStaffUser(
     body: JSON.stringify(payload),
   });
 }
+
+export function completePasswordSetup(): Promise<{ ok: true }> {
+  return json('/api/users?view=me', {
+    method: 'PATCH',
+    body: JSON.stringify({ action: 'password_setup_complete' }),
+  });
+}
