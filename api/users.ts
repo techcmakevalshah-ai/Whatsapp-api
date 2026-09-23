@@ -53,7 +53,7 @@ async function audit(
 async function serializeUsers(sb: ReturnType<typeof supabaseAdmin>) {
   const { data: staffRows, error: staffError } = await sb
     .from('staff_users')
-    .select('user_id, email, full_name, role, active, revoked_at, created_at, updated_at')
+    .select('user_id, email, full_name, role, active, revoked_at, created_at, updated_at, must_set_password')
     .order('created_at', { ascending: true });
 
   if (staffError) throw staffError;
@@ -85,6 +85,7 @@ async function serializeUsers(sb: ReturnType<typeof supabaseAdmin>) {
       invitedAt: authUser?.invited_at || null,
       lastSignInAt: authUser?.last_sign_in_at || null,
       authStatus: authUser?.email_confirmed_at ? 'registered' : 'invited',
+      mustSetPassword: row.must_set_password === true,
     };
   });
 }
@@ -106,8 +107,30 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         email: user.email || '',
         fullName: user.fullName || '',
         role: user.role,
+        mustSetPassword: user.mustSetPassword,
       },
     });
+  }
+
+  if (req.method === 'PATCH' && view === 'me' && String(req.body?.action || '') === 'password_setup_complete') {
+    const user = await requireStaff(req, res);
+    if (!user) return;
+
+    const sb = supabaseAdmin();
+    const { error } = await sb
+      .from('staff_users')
+      .update({
+        must_set_password: false,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('user_id', user.id)
+      .eq('active', true);
+
+    if (error) {
+      return res.status(500).json({ error: error.message });
+    }
+
+    return res.status(200).json({ ok: true });
   }
 
   const admin = await requireAdmin(req, res);
@@ -128,7 +151,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       const { data: existingStaff, error: existingStaffError } = await sb
         .from('staff_users')
-        .select('user_id, active')
+        .select('user_id, active, must_set_password')
         .eq('email', email)
         .maybeSingle();
 
@@ -139,6 +162,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
 
       let targetUserId = existingStaff?.user_id || '';
+      let invitedNewUser = false;
 
       if (!targetUserId) {
         const { data: authData, error: listError } = await sb.auth.admin.listUsers({
@@ -169,6 +193,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           if (!inviteData.user) throw new Error('Supabase did not return the invited user.');
 
           targetUserId = inviteData.user.id;
+          invitedNewUser = true;
         }
       }
 
@@ -182,6 +207,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           active: true,
           revoked_at: null,
           invited_by: admin.id,
+          must_set_password: invitedNewUser ? true : existingStaff?.must_set_password === true,
           updated_at: new Date().toISOString(),
         }, { onConflict: 'user_id' });
 
