@@ -40,6 +40,13 @@ export type CampaignSummary = {
   schedulerError?: string | null;
   createdAt: string;
   totalRecipients: number;
+  sentCount?: number;
+  deliveredCount?: number;
+  readCount?: number;
+  failedCount?: number;
+  queuedCount?: number;
+  processingCount?: number;
+  cancelledCount?: number;
 };
 
 export type ManagedWhatsAppTemplate = {
