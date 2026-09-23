@@ -493,22 +493,6 @@ export default function App() {
 
               {error && <div className="alert">{error}</div>}
 
-              {seriesScheduleSuccess && (
-                <div className="series-schedule-success" role="status" aria-live="polite">
-                  <div>
-                    <b>Message series scheduled</b>
-                    <span>{seriesScheduleSuccess}</span>
-                  </div>
-                  <button
-                    type="button"
-                    className="series-schedule-history-link"
-                    onClick={() => void openHistory()}
-                  >
-                    View Campaign History →
-                  </button>
-                </div>
-              )}
-
               <div className="progress">
                 {[['1','Select Contacts'],['2','Choose Content'],['3','Compose & Preview'],['4','Send & Track']]
                   .map(([step,label], index) => (
@@ -618,6 +602,21 @@ export default function App() {
                               : 'Send WhatsApp Message'}
                     </button>
                   </div>
+                  {deliveryMode === 'series' && seriesScheduleSuccess && (
+                    <div className="series-schedule-success" role="status" aria-live="polite">
+                      <div>
+                        <b>Message series scheduled</b>
+                        <span>{seriesScheduleSuccess}</span>
+                      </div>
+                      <button
+                        type="button"
+                        className="series-schedule-history-link"
+                        onClick={() => void openHistory()}
+                      >
+                        View Campaign History →
+                      </button>
+                    </div>
+                  )}
                   <div className="send-meta">
                     Selected contacts: <b>{selected.size}</b> &nbsp;|&nbsp; {deliveryMode === 'series' ? 'Series' : 'Template'}:{' '}
                     <b>
