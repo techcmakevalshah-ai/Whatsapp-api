@@ -325,5 +325,5 @@ export async function sendTemplateMessage(input: {
   });
   const json: any = await response.json();
   if (!response.ok) throw new Error(json?.error?.message || 'WhatsApp send failed.');
-  return { messageId: json.messages?.[0]?.id || '' };
+  return { messageId: json.messages?.[0]?.id || '', queued: false };
 }
