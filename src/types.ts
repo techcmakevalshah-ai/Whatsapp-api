@@ -52,6 +52,7 @@ export type ManagedWhatsAppTemplate = {
   status: 'DRAFT' | 'APPROVED' | 'SUBMITTED' | 'PENDING' | 'REJECTED' | 'PAUSED' | 'DISABLED' | string;
   variables: number;
   headerType?: 'IMAGE' | 'VIDEO' | null;
+  folderId?: string | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -107,4 +108,13 @@ export type MessageSeriesScheduleSummary = {
   schedulerError?: string | null;
   createdAt: string;
   totalRecipients: number;
+};
+
+export type TemplateFolder = {
+  id: string;
+  name: string;
+  description?: string | null;
+  active: boolean;
+  createdAt: string;
+  updatedAt: string;
 };
