@@ -31,7 +31,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const { data, error } = await sb.rpc('get_campaign_history', {
         p_user_id: user.id === 'local-development' ? null : user.id,
         p_is_admin: user.role === 'admin',
-        p_limit: 50,
+        p_limit: 500,
       });
       if (error) throw error;
 
