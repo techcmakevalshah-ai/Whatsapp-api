@@ -206,22 +206,22 @@ export function scheduleMessageSeries(payload: {
   eligibleCount: number;
   nextRunAt: string;
 }> {
-  return json('/api/message-series/schedule', {
+  return json('/api/message-series', {
     method: 'POST',
-    body: JSON.stringify(payload),
+    body: JSON.stringify({ ...payload, action: 'schedule' }),
   });
 }
 
 export function getMessageSeriesSchedules(): Promise<{ schedules: MessageSeriesScheduleSummary[] }> {
-  return json('/api/message-series-schedules');
+  return json('/api/message-series?view=schedules');
 }
 
 export function updateMessageSeriesSchedule(
   id: string,
   action: 'pause' | 'resume' | 'cancel',
 ): Promise<{ ok: true; status: string; nextRunAt?: string }> {
-  return json(`/api/message-series-schedules?id=${encodeURIComponent(id)}`, {
+  return json(`/api/message-series?id=${encodeURIComponent(id)}`, {
     method: 'PATCH',
-    body: JSON.stringify({ action }),
+    body: JSON.stringify({ scope: 'schedule', action }),
   });
 }
