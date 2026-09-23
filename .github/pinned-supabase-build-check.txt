@@ -1,0 +1,1 @@
+Temporary build check after pinning Supabase SDK.
