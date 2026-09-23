@@ -191,8 +191,14 @@ export function updateMessageSeries(id: string, payload: {
   });
 }
 
-export function disableMessageSeries(id: string): Promise<{ ok: true }> {
+export function disableMessageSeries(id: string): Promise<{ ok: true; status?: string }> {
   return json(`/api/message-series?id=${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+  });
+}
+
+export function deleteMessageSeriesPermanently(id: string): Promise<{ ok: true; status: string }> {
+  return json(`/api/message-series?id=${encodeURIComponent(id)}&permanent=1`, {
     method: 'DELETE',
   });
 }
