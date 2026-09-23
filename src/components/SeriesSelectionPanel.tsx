@@ -20,14 +20,16 @@ export function SeriesSelectionPanel({
       template.name === templateName && template.language === language,
     );
 
+  const previewDynamicValues: Record<string, string> = {
+    name: 'Contact Name',
+    phone: '919876543210',
+    category: 'General',
+  };
+
   const previewDynamicValue = (value: string) =>
     String(value || '').replace(
       /\{\{\s*(name|phone|category)\s*\}\}/gi,
-      (_, key: string) => ({
-        name: 'Contact Name',
-        phone: '919876543210',
-        category: 'General',
-      }[key.toLowerCase()] || ''),
+      (_, key: string) => previewDynamicValues[key.toLowerCase()] || '',
     );
 
   const renderPreviewBody = (body: string, values: Record<string, string>) =>
