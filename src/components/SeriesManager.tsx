@@ -75,6 +75,9 @@ export function SeriesManager({
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [deleteTarget, setDeleteTarget] = useState<MessageSeries | null>(null);
+  const [deleteConfirmName, setDeleteConfirmName] = useState('');
+  const [deletingId, setDeletingId] = useState('');
 
   const load = async () => {
     setLoading(true);
@@ -301,28 +304,37 @@ export function SeriesManager({
     }
   };
 
-  const permanentlyDelete = async (series: MessageSeries) => {
+  const openPermanentDelete = (series: MessageSeries) => {
     if (!isAdmin) return;
+    setDeleteTarget(series);
+    setDeleteConfirmName('');
+    setError('');
+  };
 
-    const confirmation = window.prompt(
-      `Permanent deletion is only allowed for unused series. Type the exact series name to delete it:\n\n${series.name}`,
-      '',
-    );
+  const closePermanentDelete = () => {
+    if (deletingId) return;
+    setDeleteTarget(null);
+    setDeleteConfirmName('');
+  };
 
-    if (confirmation === null) return;
-    if (confirmation.trim() !== series.name) {
-      setError('Series name did not match. Permanent deletion was cancelled.');
-      return;
-    }
+  const permanentlyDelete = async () => {
+    const series = deleteTarget;
+    if (!isAdmin || !series) return;
+    if (deleteConfirmName.trim() !== series.name) return;
 
+    setDeletingId(series.id);
     setError('');
     try {
       await deleteMessageSeriesPermanently(series.id);
       if (editingId === series.id) reset();
+      setDeleteTarget(null);
+      setDeleteConfirmName('');
       await load();
       await onSeriesChanged?.();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unable to permanently delete series.');
+    } finally {
+      setDeletingId('');
     }
   };
 
@@ -570,9 +582,9 @@ export function SeriesManager({
                       className="btn danger-outline series-permanent-delete"
                       type="button"
                       title="Admin only · permanently deletes unused series"
-                      onClick={() => void permanentlyDelete(series)}
+                      onClick={() => openPermanentDelete(series)}
                     >
-                      <Trash2 size={14}/> Delete Permanently
+                      <Trash2 size={14}/> Delete
                     </button>
                   )}
                 </div>
@@ -583,6 +595,79 @@ export function SeriesManager({
           <div className="empty-state">No message series yet.</div>
         )}
       </aside>
+
+      {deleteTarget && (
+        <div
+          className="series-delete-confirm-backdrop"
+          onMouseDown={closePermanentDelete}
+        >
+          <section
+            className="series-delete-confirm-modal"
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <div className="series-delete-confirm-icon">
+              <Trash2 size={22}/>
+            </div>
+
+            <div className="series-delete-confirm-copy">
+              <h3>Delete Message Series?</h3>
+              <p>
+                This permanently removes the series and all of its day definitions.
+                Series with campaign or schedule history are protected and cannot be deleted.
+              </p>
+            </div>
+
+            <div className="series-delete-target">
+              <span>Series to delete</span>
+              <b>{deleteTarget.name}</b>
+              <small>{deleteTarget.steps.length} day{deleteTarget.steps.length === 1 ? '' : 's'}</small>
+            </div>
+
+            <label className="series-delete-confirm-field">
+              <span>Type <b>{deleteTarget.name}</b> to confirm</span>
+              <input
+                autoFocus
+                value={deleteConfirmName}
+                onChange={(event) => setDeleteConfirmName(event.target.value)}
+                placeholder={deleteTarget.name}
+                disabled={Boolean(deletingId)}
+                onKeyDown={(event) => {
+                  if (
+                    event.key === 'Enter' &&
+                    deleteConfirmName.trim() === deleteTarget.name &&
+                    !deletingId
+                  ) {
+                    void permanentlyDelete();
+                  }
+                }}
+              />
+            </label>
+
+            <div className="series-delete-confirm-actions">
+              <button
+                type="button"
+                className="btn secondary"
+                onClick={closePermanentDelete}
+                disabled={Boolean(deletingId)}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="btn series-delete-danger"
+                disabled={
+                  Boolean(deletingId) ||
+                  deleteConfirmName.trim() !== deleteTarget.name
+                }
+                onClick={() => void permanentlyDelete()}
+              >
+                <Trash2 size={15}/>
+                {deletingId ? 'Deleting…' : 'Delete Permanently'}
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
     </div>
   );
 }
