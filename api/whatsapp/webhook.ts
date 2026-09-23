@@ -201,6 +201,7 @@ function extractVerificationChallenge(req: VercelRequest) {
   const direct = firstString(
     req.query['hub.challenge'],
     req.query.challenge,
+    req.query.challange,
     req.query['challenge_token'],
     req.query['verify_challenge'],
     req.query['verify.challenge'],
