@@ -28,7 +28,12 @@ function previewDynamicValue(value: string) {
 function renderPreviewBody(body: string, values: Record<string, string>) {
   return String(body || '').replace(
     /\{\{\s*(\d+)\s*\}\}/g,
-    (_, key: string) => previewDynamicValue(values[key] || `{{${key}}}`),
+    (_, key: string) => {
+      const configured = String(values[key] || '').trim();
+      return configured
+        ? previewDynamicValue(configured)
+        : `Example value ${key}`;
+    },
   );
 }
 
@@ -465,8 +470,12 @@ export function SeriesManager({
                               Upload the {selectedTemplate.headerType.toLowerCase()} to preview it here.
                             </div>
                           )}
-                          <div className="preview-message-text">
-                            {renderPreviewBody(selectedTemplate.body, step.variableValues)}
+                          <div className="preview-message-text series-preview-message-text">
+                            {renderPreviewBody(selectedTemplate.body, step.variableValues)
+                              .split('\n')
+                              .map((line, lineIndex) => (
+                                <div key={lineIndex}>{line || <br/>}</div>
+                              ))}
                           </div>
                           {selectedTemplate.footer && (
                             <div className="series-preview-footer">{selectedTemplate.footer}</div>
