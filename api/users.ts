@@ -1,8 +1,41 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { createClient } from '@supabase/supabase-js';
 import { requireAdmin, requireStaff } from '../server/auth.js';
 import { supabaseAdmin } from '../server/supabaseAdmin.js';
 
 type StaffRole = 'admin' | 'staff';
+
+const PRIMARY_ADMIN_EMAIL = 'tech.cmakevalshah@gmail.com';
+const PROJECT_URL = 'https://hdpvabvizwiawonpvzlb.supabase.co';
+const FALLBACK_PUBLISHABLE_KEY = 'sb_publishable_3jtMFXgr41bcGW1x1WZQqw_YVLi2a_I';
+
+async function verifyPrimaryAdminPassword(password: unknown) {
+  const value = String(password || '');
+  if (!value) throw new Error('Primary admin password is required.');
+
+  const verifier = createClient(
+    process.env.SUPABASE_URL || PROJECT_URL,
+    process.env.SUPABASE_PUBLISHABLE_KEY
+      || process.env.VITE_SUPABASE_ANON_KEY
+      || FALLBACK_PUBLISHABLE_KEY,
+    {
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false,
+        detectSessionInUrl: false,
+      },
+    },
+  );
+
+  const { error } = await verifier.auth.signInWithPassword({
+    email: PRIMARY_ADMIN_EMAIL,
+    password: value,
+  });
+
+  if (error) {
+    throw new Error('Primary admin password is incorrect.');
+  }
+}
 
 function normalizeEmail(value: unknown) {
   const email = String(value || '').trim().toLowerCase();
@@ -37,7 +70,7 @@ async function activeAdminCount(sb: ReturnType<typeof supabaseAdmin>) {
 async function audit(
   sb: ReturnType<typeof supabaseAdmin>,
   actorUserId: string,
-  targetUserId: string,
+  targetUserId: string | null,
   action: string,
   metadata: Record<string, unknown> = {},
 ) {
@@ -293,6 +326,46 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         });
 
         return res.status(200).json({ ok: true, status: 'active' });
+      }
+
+      if (action === 'delete_user') {
+        if (String(admin.email || '').toLowerCase() !== PRIMARY_ADMIN_EMAIL) {
+          return res.status(403).json({
+            error: 'Only the primary admin account can permanently delete users.',
+          });
+        }
+
+        if (targetUserId === admin.id || String(target.email || '').toLowerCase() === PRIMARY_ADMIN_EMAIL) {
+          return res.status(400).json({
+            error: 'The primary admin account cannot be permanently deleted.',
+          });
+        }
+
+        try {
+          await verifyPrimaryAdminPassword(req.body?.primaryAdminPassword);
+        } catch (error) {
+          return res.status(401).json({
+            error: error instanceof Error ? error.message : 'Primary admin verification failed.',
+          });
+        }
+
+        const deletedSnapshot = {
+          targetUserId,
+          email: target.email,
+          fullName: target.full_name || '',
+          role: target.role,
+          wasActive: target.active === true,
+        };
+
+        const { error: deleteError } = await sb.auth.admin.deleteUser(targetUserId, false);
+        if (deleteError) throw deleteError;
+
+        await audit(sb, admin.id, null, 'permanent_delete_user', deletedSnapshot);
+
+        return res.status(200).json({
+          ok: true,
+          status: 'deleted',
+        });
       }
 
       if (action === 'update_profile') {
