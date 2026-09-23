@@ -49,10 +49,12 @@ export function TemplateManager({
   open,
   onClose,
   onChanged,
+  isAdmin,
 }: {
   open: boolean;
   onClose: () => void;
   onChanged: () => void | Promise<void>;
+  isAdmin: boolean;
 }) {
   const [templates, setTemplates] = useState<ManagedWhatsAppTemplate[]>([]);
   const [folders, setFolders] = useState<TemplateFolder[]>([]);
@@ -525,6 +527,7 @@ export function TemplateManager({
           <SeriesManager
             templates={templates}
             onSeriesChanged={onChanged}
+            isAdmin={isAdmin}
           />
         )}
       </section>
