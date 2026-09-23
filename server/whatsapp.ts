@@ -268,13 +268,24 @@ export async function sendTemplateMessage(input: {
       );
     }
 
+    const providerMessageId =
+      json?.messages?.[0]?.id ||
+      json?.data?.messages?.[0]?.id ||
+      json?.response?.messages?.[0]?.id ||
+      json?.message_id ||
+      json?.id ||
+      '';
+
+    const queueId =
+      json?.message?.queue_id ||
+      json?.queue_id ||
+      json?.data?.message?.queue_id ||
+      json?.data?.queue_id ||
+      '';
+
     return {
-      messageId:
-        json?.messages?.[0]?.id ||
-        json?.data?.messages?.[0]?.id ||
-        json?.message_id ||
-        json?.id ||
-        '',
+      messageId: providerMessageId || queueId || '',
+      queued: Boolean(queueId && !providerMessageId),
     };
   }
 
