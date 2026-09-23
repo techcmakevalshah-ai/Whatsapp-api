@@ -153,7 +153,7 @@ export function UserManagement({
             <input
               value={form.fullName}
               onChange={(event) => setForm((previous) => ({ ...previous, fullName: event.target.value }))}
-              placeholder="e.g. Viren Patel"
+              placeholder="e.g. Keval Shah"
               maxLength={100}
             />
           </label>
