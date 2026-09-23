@@ -1,5 +1,6 @@
 import { KeyRound, ShieldCheck } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
+import { completePasswordSetup } from '../lib/api';
 import { supabase } from '../lib/supabase';
 
 export function InvitePasswordSetup({ onComplete }: { onComplete: () => void }) {
@@ -30,8 +31,11 @@ export function InvitePasswordSetup({ onComplete }: { onComplete: () => void }) 
       const { error: updateError } = await supabase.auth.updateUser({ password });
       if (updateError) throw updateError;
 
+      await completePasswordSetup();
+
       window.history.replaceState({}, document.title, window.location.pathname);
       onComplete();
+      window.location.replace('/');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unable to set password.');
     } finally {
