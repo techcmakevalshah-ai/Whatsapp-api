@@ -163,3 +163,68 @@
   .schedule-mode-three{grid-template-columns:1fr}
   .schedule-mode-toggle button+button{border-left:0;border-top:1px solid #e5eaf1}
 }
+
+.template-manager-tabs{display:flex;gap:8px;margin:-4px 0 16px;border-bottom:1px solid #e5eaf1;padding-bottom:10px}
+.template-manager-tabs button{border:1px solid #dce3ec;background:#fff;color:#64748b;border-radius:8px;padding:9px 12px;display:flex;align-items:center;gap:7px;font-weight:750;cursor:pointer}
+.template-manager-tabs button.active{background:#132842;color:#fff;border-color:#132842}
+
+.series-manager-layout{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(300px,.65fr);gap:18px;align-items:start}
+.series-builder{border:1px solid #dfe6ef;background:#fbfcfe;border-radius:12px;padding:16px}
+.series-builder-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:14px}
+.series-builder-head h3{margin:0 0 4px;color:#0b1830}
+.series-builder-head p{margin:0;color:#718096;font-size:11px}
+.series-main-fields{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px}
+.series-main-fields label{display:flex;flex-direction:column;gap:6px;font-size:11px;font-weight:750;color:#334155}
+.series-main-fields input{border:1px solid #dbe3ec;border-radius:8px;padding:10px 11px;background:#fff;font:inherit;outline:none}
+.series-toolbar{display:flex;justify-content:space-between;align-items:center;gap:10px;border-top:1px solid #e8edf3;border-bottom:1px solid #e8edf3;padding:10px 0;margin-bottom:12px}
+.series-toolbar>div{display:flex;gap:7px;flex-wrap:wrap}
+.series-step-list{display:flex;flex-direction:column;gap:12px;max-height:62vh;overflow:auto;padding-right:3px}
+.series-step-card{position:relative;border:1px solid #dfe6ef;background:#fff;border-radius:10px;padding:14px}
+.series-day-badge{position:absolute;top:12px;right:12px;background:#ede9fe;color:#5b21b6;border-radius:999px;padding:4px 9px;font-size:10px;font-weight:800}
+.series-template-select{display:flex;flex-direction:column;gap:6px;width:min(520px,calc(100% - 80px));font-size:11px;font-weight:750;color:#334155}
+.series-template-select select{width:100%}
+.series-template-preview{margin-top:10px;border:1px solid #e7ebf1;background:#f8fafc;border-radius:8px;padding:10px;display:flex;flex-direction:column;gap:3px}
+.series-template-preview b{font-size:12px;color:#172033}.series-template-preview small{font-size:10px;color:#718096}.series-template-preview div{white-space:pre-wrap;font-size:11px;line-height:1.45;color:#43526a;margin-top:4px}
+.series-variable-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
+.series-variable-grid label{display:grid;grid-template-columns:52px 1fr;gap:7px;align-items:center}
+.series-variable-grid label span{font-size:10px;background:#f1f5f9;border-radius:5px;padding:6px;text-align:center;color:#58687f}
+.series-variable-grid input{border:1px solid #dbe3ec;border-radius:7px;padding:8px 9px;font:inherit;font-size:11px;outline:none}
+.series-variable-help{grid-column:1/-1;color:#718096}
+.series-variable-help code{background:#eef2f7;padding:2px 4px;border-radius:4px}
+.series-media-row{margin-top:10px}
+.series-media-preview{display:flex;align-items:center;gap:9px;margin-top:8px}
+.series-media-preview img,.series-media-preview video{width:110px;max-height:90px;object-fit:cover;border-radius:7px;border:1px solid #dfe6ef;background:#000}
+.series-media-preview span{display:flex;gap:5px;align-items:center;color:#16733a;font-size:11px;font-weight:700}
+.series-save-button{width:100%;margin-top:14px}
+.series-library{position:sticky;top:0;display:flex;flex-direction:column;gap:10px}
+.series-library-list{display:flex;flex-direction:column;gap:10px;max-height:76vh;overflow:auto}
+.series-library-item{border:1px solid #dfe6ef;background:#fff;border-radius:10px;padding:12px}
+.series-library-item p{margin:8px 0;color:#718096;font-size:11px;line-height:1.4}
+.series-mini-days{display:flex;flex-direction:column;gap:4px;margin:9px 0}
+.series-mini-days span{font-size:10px;color:#526277;background:#f8fafc;border-radius:5px;padding:5px 6px}
+
+.series-selection-card{overflow:hidden}
+.series-select-row{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:9px}
+.series-select-row select{width:100%}
+.series-selection-empty{margin-top:10px;border:1px dashed #f1c9ad;background:#fffaf5;border-radius:8px;padding:16px;color:#8a664d;font-size:11px;text-align:center}
+.series-selected-summary{display:flex;gap:9px;align-items:center;margin-top:12px;padding:11px;background:#effaf2;border:1px solid #ccebd4;border-radius:8px;color:#176b37}
+.series-selected-summary>div{display:flex;flex-direction:column;gap:2px}.series-selected-summary b{font-size:12px}.series-selected-summary span{font-size:10px;color:#5c7664}
+.series-step-preview-list{display:flex;flex-direction:column;gap:7px;margin-top:10px;max-height:420px;overflow:auto}
+.series-step-preview-item{display:grid;grid-template-columns:55px 1fr;gap:9px;border:1px solid #e6ebf1;background:#fff;border-radius:8px;padding:9px}
+.series-step-preview-day{font-size:10px;font-weight:800;color:#5b21b6;background:#ede9fe;border-radius:6px;padding:5px;text-align:center;height:max-content}
+.series-step-preview-item>div{display:flex;flex-direction:column;gap:2px}.series-step-preview-item b{font-size:11px}.series-step-preview-item small{font-size:9px;color:#7a8799}.series-step-preview-item p{white-space:pre-wrap;margin:4px 0 0;font-size:10px;color:#526277;line-height:1.4;max-height:65px;overflow:hidden}
+.series-send-info{display:flex;align-items:center;justify-content:center;border:1px solid #d8ccf1;background:#f8f5ff;color:#5b21b6;border-radius:7px;padding:12px;font-weight:750;font-size:12px}
+
+.schedule-mode-four{grid-template-columns:repeat(4,1fr)}
+@media(max-width:1100px){
+  .series-manager-layout{grid-template-columns:1fr}
+  .series-library{position:static}
+  .schedule-mode-four{grid-template-columns:1fr 1fr}
+}
+@media(max-width:700px){
+  .series-main-fields,.series-variable-grid{grid-template-columns:1fr}
+  .series-variable-help{grid-column:auto}
+  .series-toolbar,.series-builder-head{align-items:stretch;flex-direction:column}
+  .series-template-select{width:100%;padding-right:70px}
+  .schedule-mode-four{grid-template-columns:1fr}
+}
