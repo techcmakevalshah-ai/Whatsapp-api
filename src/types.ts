@@ -33,6 +33,7 @@ export type CampaignSummary = {
   name: string;
   templateName: string;
   status: string;
+  deliveryStatus?: string;
   scheduledAt?: string | null;
   timezone?: string | null;
   canceledAt?: string | null;
