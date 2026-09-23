@@ -1,5 +1,5 @@
 import { supabase } from './supabase';
-import type { CampaignSummary, Contact, ManagedWhatsAppTemplate, RecipientStatus, RecurringCampaignSummary, WhatsAppTemplate } from '../types';
+import type { CampaignSummary, Contact, ManagedWhatsAppTemplate, MessageSeries, MessageSeriesScheduleSummary, MessageSeriesStep, RecipientStatus, RecurringCampaignSummary, WhatsAppTemplate } from '../types';
 
 async function json<T>(url: string, init?: RequestInit): Promise<T> {
   const headers = new Headers(init?.headers);
@@ -154,6 +154,73 @@ export function updateRecurringCampaign(
   action: 'pause' | 'resume' | 'cancel',
 ): Promise<{ ok: true; status: string; nextRunAt?: string }> {
   return json(`/api/recurring-campaigns?id=${encodeURIComponent(id)}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ action }),
+  });
+}
+
+export function getMessageSeries(): Promise<{ series: MessageSeries[] }> {
+  return json('/api/message-series');
+}
+
+export function createMessageSeries(payload: {
+  name: string;
+  description?: string;
+  steps: MessageSeriesStep[];
+}): Promise<{ series: MessageSeries }> {
+  return json('/api/message-series', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export function updateMessageSeries(id: string, payload: {
+  name: string;
+  description?: string;
+  steps: MessageSeriesStep[];
+}): Promise<{ series: MessageSeries }> {
+  return json(`/api/message-series?id=${encodeURIComponent(id)}`, {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
+  });
+}
+
+export function disableMessageSeries(id: string): Promise<{ ok: true }> {
+  return json(`/api/message-series?id=${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+  });
+}
+
+export function scheduleMessageSeries(payload: {
+  name: string;
+  seriesId: string;
+  contactIds: string[];
+  startAt: string;
+  timezone: string;
+}): Promise<{
+  ok: true;
+  scheduleId: string;
+  seriesId: string;
+  seriesName: string;
+  totalDays: number;
+  eligibleCount: number;
+  nextRunAt: string;
+}> {
+  return json('/api/message-series/schedule', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export function getMessageSeriesSchedules(): Promise<{ schedules: MessageSeriesScheduleSummary[] }> {
+  return json('/api/message-series-schedules');
+}
+
+export function updateMessageSeriesSchedule(
+  id: string,
+  action: 'pause' | 'resume' | 'cancel',
+): Promise<{ ok: true; status: string; nextRunAt?: string }> {
+  return json(`/api/message-series-schedules?id=${encodeURIComponent(id)}`, {
     method: 'PATCH',
     body: JSON.stringify({ action }),
   });
