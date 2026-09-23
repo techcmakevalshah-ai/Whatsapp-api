@@ -1,6 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import crypto from 'node:crypto';
 import { requireStaff } from '../server/auth.js';
+import { fetchSheetContacts } from '../server/googleSheets.js';
 import { supabaseAdmin } from '../server/supabaseAdmin.js';
 
 type IncomingStep = {
@@ -10,6 +11,15 @@ type IncomingStep = {
   mediaUrl?: string | null;
   variableValues?: Record<string, string>;
 };
+
+function validTimezone(value: string) {
+  try {
+    new Intl.DateTimeFormat('en-US', { timeZone: value }).format(new Date());
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 function validateSteps(steps: IncomingStep[]) {
   if (!Array.isArray(steps) || !steps.length) {
@@ -121,6 +131,223 @@ async function serializeSeries(sb: ReturnType<typeof supabaseAdmin>, ownerId?: s
   }));
 }
 
+async function serializeSchedules(sb: ReturnType<typeof supabaseAdmin>, ownerId?: string | null) {
+  let query = sb
+    .from('message_series_schedules')
+    .select('id, series_id, name, status, timezone, start_at, next_run_at, total_days, runs_created, last_run_at, scheduler_error, created_at, message_series(name), message_series_schedule_recipients(count)')
+    .order('created_at', { ascending: false })
+    .limit(50);
+
+  if (ownerId) query = query.eq('created_by', ownerId);
+
+  const { data, error } = await query;
+  if (error) throw error;
+
+  return (data || []).map((row: any) => ({
+    id: row.id,
+    seriesId: row.series_id,
+    seriesName: row.message_series?.name || 'Message Series',
+    name: row.name,
+    status: row.status,
+    timezone: row.timezone,
+    startAt: row.start_at,
+    nextRunAt: row.next_run_at,
+    totalDays: row.total_days,
+    runsCreated: row.runs_created,
+    lastRunAt: row.last_run_at,
+    schedulerError: row.scheduler_error,
+    createdAt: row.created_at,
+    totalRecipients: row.message_series_schedule_recipients?.[0]?.count || 0,
+  }));
+}
+
+async function createSchedule(
+  req: VercelRequest,
+  res: VercelResponse,
+  sb: ReturnType<typeof supabaseAdmin>,
+  ownerId: string | null,
+) {
+  const { name, seriesId, contactIds, startAt, timezone } = req.body || {};
+
+  if (!String(name || '').trim() || !seriesId || !Array.isArray(contactIds) || !contactIds.length) {
+    return res.status(400).json({ error: 'Campaign name, message series and contacts are required.' });
+  }
+
+  const startDate = new Date(String(startAt || ''));
+  if (Number.isNaN(startDate.getTime())) {
+    return res.status(400).json({ error: 'Choose a valid first send date and time.' });
+  }
+  if (startDate.getTime() <= Date.now() + 60_000) {
+    return res.status(400).json({ error: 'First send time must be at least 1 minute in the future.' });
+  }
+
+  const timezoneValue = String(timezone || 'UTC').trim() || 'UTC';
+  if (!validTimezone(timezoneValue)) {
+    return res.status(400).json({ error: 'Invalid timezone.' });
+  }
+
+  let seriesQuery = sb
+    .from('message_series')
+    .select('id, name, status, created_by')
+    .eq('id', String(seriesId))
+    .eq('status', 'READY');
+
+  if (ownerId) seriesQuery = seriesQuery.eq('created_by', ownerId);
+
+  const { data: series, error: seriesError } = await seriesQuery.maybeSingle();
+  if (seriesError) throw seriesError;
+  if (!series) return res.status(404).json({ error: 'Ready message series not found.' });
+
+  const { data: steps, error: stepsError } = await sb
+    .from('message_series_steps')
+    .select('day_number')
+    .eq('series_id', series.id)
+    .eq('active', true)
+    .order('day_number', { ascending: true });
+
+  if (stepsError) throw stepsError;
+  if (!steps?.length) return res.status(400).json({ error: 'This message series has no active days.' });
+  if (steps.length > 90) return res.status(400).json({ error: 'Message series exceeds the 90-day limit.' });
+
+  for (let index = 0; index < steps.length; index += 1) {
+    if (Number(steps[index].day_number) !== index + 1) {
+      return res.status(400).json({ error: 'Message series days must be continuous from Day 1.' });
+    }
+  }
+
+  const liveContacts = await fetchSheetContacts();
+  const requestedIds = new Set(contactIds.map(String));
+  const selectedContacts = liveContacts.filter(
+    (contact) => requestedIds.has(contact.id) && contact.status === 'Active',
+  );
+
+  if (!selectedContacts.length) {
+    return res.status(400).json({ error: 'Select at least one active contact.' });
+  }
+  if (selectedContacts.length !== requestedIds.size) {
+    return res.status(400).json({
+      error: 'One or more selected contacts changed or are inactive. Refresh contacts and try again.',
+    });
+  }
+
+  const scheduleId = crypto.randomUUID();
+  const { error: scheduleError } = await sb.from('message_series_schedules').insert({
+    id: scheduleId,
+    series_id: series.id,
+    name: String(name).trim().slice(0, 120),
+    timezone: timezoneValue,
+    start_at: startDate.toISOString(),
+    next_run_at: startDate.toISOString(),
+    total_days: steps.length,
+    runs_created: 0,
+    status: 'active',
+    created_by: ownerId,
+  });
+
+  if (scheduleError) throw scheduleError;
+
+  const recipients = selectedContacts.map((contact) => ({
+    id: crypto.randomUUID(),
+    schedule_id: scheduleId,
+    phone: contact.phone,
+    initial_name: contact.name,
+    initial_category: contact.category,
+  }));
+
+  const { error: recipientsError } = await sb
+    .from('message_series_schedule_recipients')
+    .insert(recipients);
+
+  if (recipientsError) throw recipientsError;
+
+  return res.status(201).json({
+    ok: true,
+    scheduleId,
+    seriesId: series.id,
+    seriesName: series.name,
+    totalDays: steps.length,
+    eligibleCount: selectedContacts.length,
+    nextRunAt: startDate.toISOString(),
+  });
+}
+
+async function updateSchedule(
+  req: VercelRequest,
+  res: VercelResponse,
+  sb: ReturnType<typeof supabaseAdmin>,
+  ownerId: string | null,
+) {
+  const id = String(req.query.id || req.body?.id || '').trim();
+  const action = String(req.body?.action || '').trim().toLowerCase();
+
+  if (!id) return res.status(400).json({ error: 'Series schedule id is required.' });
+  if (!['pause', 'resume', 'cancel'].includes(action)) {
+    return res.status(400).json({ error: 'Unsupported series schedule action.' });
+  }
+
+  let ownership = sb
+    .from('message_series_schedules')
+    .select('id, status, runs_created, total_days, created_by')
+    .eq('id', id);
+
+  if (ownerId) ownership = ownership.eq('created_by', ownerId);
+
+  const { data: schedule, error: scheduleError } = await ownership.maybeSingle();
+  if (scheduleError) throw scheduleError;
+  if (!schedule) return res.status(404).json({ error: 'Series schedule not found.' });
+
+  if (action === 'pause') {
+    if (schedule.status !== 'active') {
+      return res.status(409).json({ error: 'Only an active series can be paused.' });
+    }
+
+    const { error } = await sb
+      .from('message_series_schedules')
+      .update({ status: 'paused', locked_at: null, updated_at: new Date().toISOString() })
+      .eq('id', id)
+      .eq('status', 'active');
+
+    if (error) throw error;
+    return res.status(200).json({ ok: true, status: 'paused' });
+  }
+
+  if (action === 'resume') {
+    if (schedule.status !== 'paused') {
+      return res.status(409).json({ error: 'Only a paused series can be resumed.' });
+    }
+
+    const { data, error } = await sb.rpc('resume_message_series_schedule', {
+      p_schedule_id: id,
+    });
+
+    if (error) throw error;
+    if (!data) return res.status(409).json({ error: 'This series cannot be resumed.' });
+
+    return res.status(200).json({
+      ok: true,
+      status: data.status,
+      nextRunAt: data.next_run_at,
+    });
+  }
+
+  if (!['active', 'paused'].includes(schedule.status)) {
+    return res.status(409).json({ error: 'This series can no longer be canceled.' });
+  }
+
+  const { error } = await sb
+    .from('message_series_schedules')
+    .update({
+      status: 'canceled',
+      next_run_at: null,
+      locked_at: null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', id);
+
+  if (error) throw error;
+  return res.status(200).json({ ok: true, status: 'canceled' });
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const user = await requireStaff(req, res);
   if (!user) return;
@@ -130,8 +357,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   try {
     if (req.method === 'GET') {
+      if (String(req.query.view || '') === 'schedules') {
+        const schedules = await serializeSchedules(sb, ownerId);
+        return res.status(200).json({ schedules });
+      }
+
       const series = await serializeSeries(sb, ownerId);
       return res.status(200).json({ series });
+    }
+
+    if (req.method === 'POST' && String(req.body?.action || '') === 'schedule') {
+      return await createSchedule(req, res, sb, ownerId);
+    }
+
+    if (req.method === 'PATCH' && String(req.body?.scope || '') === 'schedule') {
+      return await updateSchedule(req, res, sb, ownerId);
     }
 
     if (req.method === 'POST' || req.method === 'PATCH') {
@@ -188,20 +428,30 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (deactivateError) throw deactivateError;
 
       for (const step of validatedSteps) {
-        const { error: stepError } = await sb
+        const { data: existingStep, error: existingStepError } = await sb
           .from('message_series_steps')
-          .upsert({
-            id: crypto.randomUUID(),
-            series_id: id,
-            day_number: Number(step.dayNumber),
-            template_name: step.templateName,
-            template_language: step.templateLanguage,
-            header_type: step.headerType || null,
-            media_url: String(step.mediaUrl || '').trim() || null,
-            variable_values: step.variableValues || {},
-            active: true,
-            updated_at: now,
-          }, { onConflict: 'series_id,day_number', ignoreDuplicates: false });
+          .select('id')
+          .eq('series_id', id)
+          .eq('day_number', Number(step.dayNumber))
+          .maybeSingle();
+
+        if (existingStepError) throw existingStepError;
+
+        const stepPayload = {
+          series_id: id,
+          day_number: Number(step.dayNumber),
+          template_name: step.templateName,
+          template_language: step.templateLanguage,
+          header_type: step.headerType || null,
+          media_url: String(step.mediaUrl || '').trim() || null,
+          variable_values: step.variableValues || {},
+          active: true,
+          updated_at: now,
+        };
+
+        const { error: stepError } = existingStep
+          ? await sb.from('message_series_steps').update(stepPayload).eq('id', existingStep.id)
+          : await sb.from('message_series_steps').insert({ id: crypto.randomUUID(), ...stepPayload });
 
         if (stepError) throw stepError;
       }
