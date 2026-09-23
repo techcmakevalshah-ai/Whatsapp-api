@@ -1,0 +1,1 @@
+Temporary build check for compact WhatsApp-style series preview.
