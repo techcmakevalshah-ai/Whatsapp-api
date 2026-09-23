@@ -14,13 +14,28 @@ import { Login } from './components/Login';
 import { TemplateManager } from './components/TemplateManager';
 import { TestMessageDialog } from './components/TestMessageDialog';
 import { SeriesSelectionPanel } from './components/SeriesSelectionPanel';
-import { cancelCampaign, getCampaigns, getCampaignStatus, getContacts, getMessageSeries, getMessageSeriesSchedules, getRecurringCampaigns, getTemplates, rescheduleCampaign, scheduleMessageSeries, sendCampaign, updateMessageSeriesSchedule, updateRecurringCampaign } from './lib/api';
+import { UserManagement } from './components/UserManagement';
+import { InvitePasswordSetup } from './components/InvitePasswordSetup';
+import { cancelCampaign, getCampaigns, getCampaignStatus, getContacts, getCurrentStaffProfile, getMessageSeries, getMessageSeriesSchedules, getRecurringCampaigns, getStaffUsers, getTemplates, rescheduleCampaign, scheduleMessageSeries, sendCampaign, updateMessageSeriesSchedule, updateRecurringCampaign } from './lib/api';
 import { supabase } from './lib/supabase';
-import type { CampaignSummary, Contact, MessageSeries, MessageSeriesScheduleSummary, RecipientStatus, RecurringCampaignSummary, WhatsAppTemplate } from './types';
+import type { CampaignSummary, Contact, MessageSeries, MessageSeriesScheduleSummary, RecipientStatus, RecurringCampaignSummary, StaffProfile, StaffUserProfile, WhatsAppTemplate } from './types';
 
 export default function App() {
   const [session, setSession] = useState<Session | null>(null);
   const [authReady, setAuthReady] = useState(!supabase);
+  const [profileReady, setProfileReady] = useState(!supabase);
+  const [profile, setProfile] = useState<StaffProfile | null>(supabase ? null : {
+    id: 'local-development',
+    email: 'local@development.test',
+    fullName: 'Local Development',
+    role: 'admin',
+  });
+  const [profileError, setProfileError] = useState('');
+  const [inviteMode, setInviteMode] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return new URLSearchParams(window.location.search).get('invite') === '1'
+      || window.location.hash.includes('type=invite');
+  });
   const [page, setPage] = useState<AppPage>('whatsapp');
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [templates, setTemplates] = useState<WhatsAppTemplate[]>([]);
@@ -52,6 +67,9 @@ export default function App() {
   const [historyError, setHistoryError] = useState('');
   const [templateManagerOpen, setTemplateManagerOpen] = useState(false);
   const [testMessageOpen, setTestMessageOpen] = useState(false);
+  const [staffUsers, setStaffUsers] = useState<StaffUserProfile[]>([]);
+  const [usersLoading, setUsersLoading] = useState(false);
+  const [usersError, setUsersError] = useState('');
 
   const chosenContacts = useMemo(
     () => contacts.filter((contact) => selected.has(contact.id)),
@@ -73,6 +91,35 @@ export default function App() {
     );
     return () => subscription.subscription.unsubscribe();
   }, []);
+
+  useEffect(() => {
+    if (!supabase) return;
+    if (!authReady) return;
+
+    if (!session) {
+      setProfile(null);
+      setProfileError('');
+      setProfileReady(true);
+      return;
+    }
+
+    setProfileReady(false);
+    setProfileError('');
+
+    void getCurrentStaffProfile()
+      .then((data) => {
+        setProfile(data.profile);
+        setProfileReady(true);
+        if (data.profile.role !== 'admin' && page === 'users') {
+          setPage('whatsapp');
+        }
+      })
+      .catch((err) => {
+        setProfile(null);
+        setProfileError(err instanceof Error ? err.message : 'Unable to verify account access.');
+        setProfileReady(true);
+      });
+  }, [authReady, session?.user.id]);
 
   const applyContacts = (nextContacts: Contact[], nextSyncedAt: string) => {
     setContacts(nextContacts);
@@ -121,12 +168,32 @@ export default function App() {
     }
   };
 
+  const refreshStaffUsers = async () => {
+    if (profile?.role !== 'admin') return;
+    setUsersLoading(true);
+    setUsersError('');
+    try {
+      const data = await getStaffUsers();
+      setStaffUsers(data.users);
+    } catch (err) {
+      setUsersError(err instanceof Error ? err.message : 'Unable to load user profiles.');
+    } finally {
+      setUsersLoading(false);
+    }
+  };
+
   useEffect(() => {
-    if (!authReady || (supabase && !session)) return;
+    if (!authReady || !profileReady || (supabase && (!session || !profile))) return;
     void refreshContacts();
     void refreshTemplates();
     void refreshMessageSeries();
-  }, [authReady, session?.user.id]);
+  }, [authReady, profileReady, session?.user.id, profile?.id]);
+
+  useEffect(() => {
+    if (page === 'users' && profile?.role === 'admin') {
+      void refreshStaffUsers();
+    }
+  }, [page, profile?.role]);
 
   useEffect(() => {
     if (!campaignId || !statusRows.some((row) => ['Queued', 'Processing', 'Sent', 'Delivered'].includes(row.status))) return;
@@ -288,13 +355,32 @@ export default function App() {
     setMessageSeriesSchedules(data.schedules);
   };
 
-  if (!authReady) return <div className="app-loading">Loading…</div>;
+  if (!authReady || (session && !profileReady)) return <div className="app-loading">Loading…</div>;
   if (supabase && !session) return <Login />;
+
+  if (session && inviteMode) {
+    return <InvitePasswordSetup onComplete={() => setInviteMode(false)} />;
+  }
+
+  if (supabase && session && !profile) {
+    return (
+      <div className="login-page">
+        <div className="login-card access-denied-card">
+          <h1>Access Unavailable</h1>
+          <p>{profileError || 'This account does not have active dashboard access.'}</p>
+          <button className="send-btn" onClick={() => void supabase.auth.signOut()}>
+            <LogOut size={17}/> Sign Out
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="app-shell">
       <Sidebar
         page={page}
+        isAdmin={profile?.role === 'admin'}
         onNavigate={setPage}
         onHistory={openHistory}
         onTemplates={() => setTemplateManagerOpen(true)}
@@ -303,14 +389,28 @@ export default function App() {
       <main className="main">
         <header className="topbar">
           <div>
-            <span>{page === 'contacts' ? 'Contacts' : 'Campaigns'}</span>
+            <span>
+              {page === 'contacts' ? 'Contacts' : page === 'users' ? 'Administration' : 'Campaigns'}
+            </span>
             <b>›</b>
-            <span>{page === 'contacts' ? 'Google Sheet' : 'New Campaign'}</span>
+            <span>
+              {page === 'contacts' ? 'Google Sheet' : page === 'users' ? 'Users & Access' : 'New Campaign'}
+            </span>
           </div>
           <div className="user">
             <Bell size={18}/>
-            <span className="avatar">KS</span>
-            <b>{session?.user.email || 'Local Staff'}</b>
+            <span className="avatar">
+              {(profile?.fullName || profile?.email || 'Staff')
+                .split(/\s+/)
+                .filter(Boolean)
+                .slice(0, 2)
+                .map((part) => part[0]?.toUpperCase())
+                .join('') || 'ST'}
+            </span>
+            <div className="topbar-profile">
+              <b>{profile?.fullName || profile?.email || 'Local Staff'}</b>
+              <span>{profile?.role === 'admin' ? 'Admin' : 'Staff'}</span>
+            </div>
             <ChevronDown size={15}/>
             {supabase && (
               <button
@@ -325,7 +425,15 @@ export default function App() {
         </header>
 
         <div className="content">
-          {page === 'contacts' ? (
+          {page === 'users' && profile?.role === 'admin' ? (
+            <UserManagement
+              currentProfile={profile}
+              users={staffUsers}
+              loading={usersLoading}
+              error={usersError}
+              onRefresh={refreshStaffUsers}
+            />
+          ) : page === 'contacts' ? (
             <ContactsManager
               contacts={contacts}
               syncedAt={syncedAt}
