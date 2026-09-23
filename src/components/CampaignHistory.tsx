@@ -11,9 +11,11 @@ function toLocalInput(iso?: string | null) {
 }
 
 function statusClass(status: string) {
-  if (status === 'sent' || status === 'active' || status === 'completed') return 'ok';
-  if (status === 'scheduled' || status === 'sending' || status === 'paused') return 'pending-pill';
-  if (status === 'sent_with_errors') return 'bad';
+  const value = status.toLowerCase();
+  if (['sent', 'delivered', 'active', 'completed'].includes(value)) return 'ok';
+  if (value === 'read') return 'read';
+  if (['failed', 'sent_with_errors'].includes(value)) return 'bad';
+  if (['scheduled', 'sending', 'paused', 'queued', 'processing', 'mixed'].includes(value)) return 'pending-pill';
   return 'muted';
 }
 
@@ -52,6 +54,21 @@ export function CampaignHistory({
   const [actionError, setActionError] = useState('');
 
   if (!open) return null;
+
+  const historyTotals = campaigns.reduce(
+    (total, campaign) => ({
+      recipients: total.recipients + Number(campaign.totalRecipients || 0),
+      sent: total.sent + Number(campaign.sentCount || 0),
+      delivered: total.delivered + Number(campaign.deliveredCount || 0),
+      read: total.read + Number(campaign.readCount || 0),
+      failed: total.failed + Number(campaign.failedCount || 0),
+      pending:
+        total.pending +
+        Number(campaign.queuedCount || 0) +
+        Number(campaign.processingCount || 0),
+    }),
+    { recipients: 0, sent: 0, delivered: 0, read: 0, failed: 0, pending: 0 },
+  );
 
   const beginReschedule = (campaign: CampaignSummary) => {
     setEditingId(campaign.id);
@@ -335,6 +352,18 @@ export function CampaignHistory({
         )}
 
         <div className="history-section-title one-time-title">One-time Campaigns & Daily Send Records</div>
+
+        {!loading && campaigns.length > 0 && (
+          <div className="history-delivery-summary">
+            <div><span>Total Recipients</span><b>{historyTotals.recipients}</b></div>
+            <div><span>Sent</span><b>{historyTotals.sent}</b></div>
+            <div><span>Delivered</span><b>{historyTotals.delivered}</b></div>
+            <div><span>Read</span><b>{historyTotals.read}</b></div>
+            <div><span>Failed</span><b>{historyTotals.failed}</b></div>
+            <div><span>Pending</span><b>{historyTotals.pending}</b></div>
+          </div>
+        )}
+
         {loading ? (
           <div className="empty-state">Loading campaigns…</div>
         ) : campaigns.length ? (
@@ -345,7 +374,13 @@ export function CampaignHistory({
                   <th>Name</th>
                   <th>Template</th>
                   <th>Recipients</th>
-                  <th>Status</th>
+                  <th>Sent</th>
+                  <th>Delivered</th>
+                  <th>Read</th>
+                  <th>Failed</th>
+                  <th>Queued</th>
+                  <th>Processing</th>
+                  <th>Final Status</th>
                   <th>Scheduled</th>
                   <th>Created</th>
                   <th>Action</th>
@@ -362,7 +397,13 @@ export function CampaignHistory({
                       )}
                     </td>
                     <td>{campaign.templateName}</td>
-                    <td>{campaign.totalRecipients}</td>
+                    <td><b>{campaign.totalRecipients}</b></td>
+                    <td><span className="history-count sent">{campaign.sentCount || 0}</span></td>
+                    <td><span className="history-count delivered">{campaign.deliveredCount || 0}</span></td>
+                    <td><span className="history-count read">{campaign.readCount || 0}</span></td>
+                    <td><span className="history-count failed">{campaign.failedCount || 0}</span></td>
+                    <td>{campaign.queuedCount || 0}</td>
+                    <td>{campaign.processingCount || 0}</td>
                     <td>
                       <span className={'pill ' + statusClass(campaign.deliveryStatus || campaign.status)}>
                         {statusLabel(campaign.deliveryStatus || campaign.status)}
