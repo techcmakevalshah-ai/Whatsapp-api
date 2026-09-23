@@ -1,4 +1,4 @@
-import { Ban, CheckCircle2, Crown, Pencil, Plus, Search, ShieldCheck, UserRound } from 'lucide-react';
+import { Ban, CheckCircle2, Crown, LockKeyhole, Pencil, Plus, Search, ShieldCheck, Trash2, UserRound, X } from 'lucide-react';
 import { useMemo, useState, type FormEvent } from 'react';
 import { getStaffUsers, inviteStaffUser, updateStaffUser } from '../lib/api';
 import type { StaffProfile, StaffUserProfile } from '../types';
@@ -21,6 +21,9 @@ export function UserManagement({
   const [success, setSuccess] = useState('');
   const [saving, setSaving] = useState(false);
   const [busyId, setBusyId] = useState('');
+  const [deleteTarget, setDeleteTarget] = useState<StaffUserProfile | null>(null);
+  const [deletePassword, setDeletePassword] = useState('');
+  const [deleteBusy, setDeleteBusy] = useState(false);
   const [form, setForm] = useState({
     fullName: '',
     email: '',
@@ -121,6 +124,53 @@ export function UserManagement({
       setBusyId('');
     }
   };
+
+  const openDelete = (user: StaffUserProfile) => {
+    setDeleteTarget(user);
+    setDeletePassword('');
+    setLocalError('');
+    setSuccess('');
+  };
+
+  const closeDelete = () => {
+    if (deleteBusy) return;
+    setDeleteTarget(null);
+    setDeletePassword('');
+  };
+
+  const permanentlyDelete = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!deleteTarget) return;
+
+    if (!deletePassword) {
+      setLocalError('Enter the primary admin password to continue.');
+      return;
+    }
+
+    setDeleteBusy(true);
+    setLocalError('');
+    setSuccess('');
+
+    try {
+      await updateStaffUser(deleteTarget.id, {
+        action: 'delete_user',
+        primaryAdminPassword: deletePassword,
+      });
+
+      const deletedEmail = deleteTarget.email;
+      setDeleteTarget(null);
+      setDeletePassword('');
+      setSuccess(`User ${deletedEmail} permanently deleted.`);
+      await onRefresh();
+    } catch (err) {
+      setLocalError(err instanceof Error ? err.message : 'Unable to permanently delete user.');
+    } finally {
+      setDeleteBusy(false);
+    }
+  };
+
+  const canPermanentlyDelete =
+    currentProfile.email.trim().toLowerCase() === 'tech.cmakevalshah@gmail.com';
 
   return (
     <div className="users-page">
@@ -281,6 +331,17 @@ export function UserManagement({
                             {busyId === user.id ? 'Updating…' : user.active ? 'Revoke' : 'Reactivate'}
                           </button>
                         )}
+
+                        {!isYou && canPermanentlyDelete && (
+                          <button
+                            className="btn user-delete-btn"
+                            type="button"
+                            disabled={busyId === user.id || deleteBusy}
+                            onClick={() => openDelete(user)}
+                          >
+                            <Trash2 size={14}/> Delete
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -298,6 +359,65 @@ export function UserManagement({
           </table>
         </div>
       </section>
+
+      {deleteTarget && (
+        <div className="modal-backdrop user-delete-backdrop" onMouseDown={closeDelete}>
+          <form
+            className="user-delete-modal"
+            onSubmit={permanentlyDelete}
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <div className="modal-head">
+              <div>
+                <h2>Permanently Delete User</h2>
+                <p>This removes the Supabase login and user profile. Historical campaign/template records remain.</p>
+              </div>
+              <button className="icon-btn" type="button" onClick={closeDelete} disabled={deleteBusy}>
+                <X size={19}/>
+              </button>
+            </div>
+
+            <div className="user-delete-target">
+              <Trash2 size={18}/>
+              <div>
+                <b>{deleteTarget.fullName || 'Unnamed User'}</b>
+                <span>{deleteTarget.email}</span>
+              </div>
+            </div>
+
+            <div className="user-delete-warning">
+              This action cannot be undone. To authorize it, enter the current password for
+              <b> tech.cmakevalshah@gmail.com</b>.
+            </div>
+
+            <label className="user-delete-password">
+              <span>Primary Admin Password</span>
+              <div>
+                <LockKeyhole size={16}/>
+                <input
+                  type="password"
+                  autoComplete="current-password"
+                  value={deletePassword}
+                  onChange={(event) => setDeletePassword(event.target.value)}
+                  placeholder="Enter password"
+                  required
+                  autoFocus
+                />
+              </div>
+            </label>
+
+            <div className="user-delete-actions">
+              <button className="btn secondary" type="button" onClick={closeDelete} disabled={deleteBusy}>
+                Cancel
+              </button>
+              <button className="btn user-delete-confirm-btn" disabled={deleteBusy || !deletePassword}>
+                <Trash2 size={15}/>
+                {deleteBusy ? 'Verifying & Deleting…' : 'Permanently Delete'}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
     </div>
   );
 }
