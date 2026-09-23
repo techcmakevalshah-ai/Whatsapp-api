@@ -1,5 +1,5 @@
 import { supabase } from './supabase';
-import type { CampaignSummary, Contact, ManagedWhatsAppTemplate, MessageSeries, MessageSeriesScheduleSummary, MessageSeriesStep, RecipientStatus, RecurringCampaignSummary, TemplateFolder, WhatsAppTemplate } from '../types';
+import type { CampaignSummary, Contact, ManagedWhatsAppTemplate, MessageSeries, MessageSeriesScheduleSummary, MessageSeriesStep, RecipientStatus, RecurringCampaignSummary, StaffProfile, StaffUserProfile, TemplateFolder, WhatsAppTemplate } from '../types';
 
 async function json<T>(url: string, init?: RequestInit): Promise<T> {
   const headers = new Headers(init?.headers);
@@ -261,5 +261,37 @@ export function moveManagedTemplate(
   return json(`/api/templates?id=${encodeURIComponent(id)}`, {
     method: 'PATCH',
     body: JSON.stringify({ scope: 'move', folderId }),
+  });
+}
+
+export function getCurrentStaffProfile(): Promise<{ profile: StaffProfile }> {
+  return json('/api/users?view=me');
+}
+
+export function getStaffUsers(): Promise<{ users: StaffUserProfile[] }> {
+  return json('/api/users');
+}
+
+export function inviteStaffUser(payload: {
+  fullName: string;
+  email: string;
+  role: 'admin' | 'staff';
+}): Promise<{ user: StaffUserProfile; invitationSent: boolean }> {
+  return json('/api/users', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export function updateStaffUser(
+  id: string,
+  payload:
+    | { action: 'revoke' }
+    | { action: 'reactivate' }
+    | { action: 'update_profile'; fullName: string; role: 'admin' | 'staff' },
+): Promise<{ ok: true; status?: string }> {
+  return json(`/api/users?id=${encodeURIComponent(id)}`, {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
   });
 }
