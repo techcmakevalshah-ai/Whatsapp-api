@@ -50,6 +50,7 @@ function parseCallbackData(value: unknown) {
 type StatusCandidate = {
   status: string;
   messageId: string | null;
+  resolvedMessageId: string | null;
   recipientId: string | null;
   templateName: string | null;
   timestamp: unknown;
@@ -69,6 +70,7 @@ function collectMetaStatusCandidates(body: any) {
         output.push({
           status: normalizedStatus,
           messageId: firstString(status?.id),
+          resolvedMessageId: null,
           recipientId: firstString(status?.recipient_id, change?.value?.contacts?.[0]?.wa_id),
           templateName: firstString(callbackData?.template),
           timestamp: status?.timestamp,
@@ -83,6 +85,56 @@ function collectMetaStatusCandidates(body: any) {
   }
 
   return output;
+}
+
+function collectOfficialWaQueueStatusCandidates(body: any) {
+  const normalizedStatus = String(body?.message?.message_status || '').trim().toLowerCase();
+  if (!ALLOWED_STATUSES.has(normalizedStatus)) return [] as StatusCandidate[];
+
+  const queueId = firstString(
+    body?.message?.queue_id,
+    body?.queue_id,
+    body?.data?.message?.queue_id,
+    body?.data?.queue_id,
+  );
+  if (!queueId) return [] as StatusCandidate[];
+
+  const resolvedMessageId = firstString(
+    body?.response?.messages?.[0]?.id,
+    body?.response?.data?.messages?.[0]?.id,
+    body?.data?.response?.messages?.[0]?.id,
+  );
+
+  const recipientId = firstString(
+    body?.response?.contacts?.[0]?.wa_id,
+    body?.response?.contacts?.[0]?.input,
+    body?.contact?.wa_id,
+    body?.phone,
+  );
+
+  const error = firstString(
+    body?.response?.error?.error_data?.details,
+    body?.response?.error?.message,
+    body?.response?.error?.error_user_msg,
+    body?.response?.error?.error_user_title,
+    body?.error?.message,
+    body?.error,
+  );
+
+  return [{
+    status: normalizedStatus,
+    messageId: queueId,
+    resolvedMessageId,
+    recipientId,
+    templateName: null,
+    timestamp:
+      body?.message?.timestamp ??
+      body?.response?.timestamp ??
+      body?.timestamp ??
+      body?.created_at ??
+      body?.updated_at,
+    error,
+  }] satisfies StatusCandidate[];
 }
 
 async function findRecipientByMessageId(
@@ -167,7 +219,9 @@ async function applyStatus(
   const timestamp = isoFromTimestamp(candidate.timestamp);
   const update: Record<string, unknown> = {};
 
-  if (!recipient.provider_message_id) {
+  if (candidate.resolvedMessageId) {
+    update.provider_message_id = candidate.resolvedMessageId;
+  } else if (!recipient.provider_message_id) {
     update.provider_message_id = candidate.messageId;
   }
 
@@ -337,7 +391,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   try {
     const body = req.body && typeof req.body === 'object' ? req.body : {};
-    const candidates = collectMetaStatusCandidates(body);
+    const candidates = [
+      ...collectMetaStatusCandidates(body),
+      ...collectOfficialWaQueueStatusCandidates(body),
+    ];
     const sb = supabaseAdmin();
 
     // If OfficialWA performs a POST reachability check without a challenge,
@@ -364,7 +421,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       .insert({
         id: crypto.randomUUID(),
         event_type: first?.status || body?.entry?.[0]?.changes?.[0]?.field || null,
-        provider_message_id: first?.messageId || null,
+        provider_message_id: first?.resolvedMessageId || first?.messageId || null,
         phone: normalizePhone(first?.recipientId || firstValue?.contacts?.[0]?.wa_id) || null,
         payload: body,
         processed,
