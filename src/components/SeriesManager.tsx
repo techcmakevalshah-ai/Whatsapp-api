@@ -12,7 +12,7 @@ import type { ManagedWhatsAppTemplate, MessageSeries, MessageSeriesStep } from '
 
 type EditableStep = MessageSeriesStep & { uploading?: boolean; uploadError?: string };
 
-const MAX_MEDIA_SIZE = 100 * 1024 * 1024;
+const MAX_MEDIA_SIZE = 15 * 1024 * 1024;
 const PREVIEW_DYNAMIC_VALUES: Record<string, string> = {
   name: 'Contact Name',
   phone: '919876543210',
@@ -183,7 +183,7 @@ export function SeriesManager({
         throw new Error('This template requires a video file.');
       }
       if (file.size > MAX_MEDIA_SIZE) {
-        throw new Error('File is too large. Maximum upload size is 100 MB.');
+        throw new Error('File is too large. Maximum upload size is 15 MB.');
       }
 
       const ext = file.name.includes('.') ? file.name.split('.').pop() : '';
@@ -457,7 +457,7 @@ export function SeriesManager({
                           <span>
                             {step.uploading
                               ? 'Uploading…'
-                              : `Upload ${selectedTemplate.headerType === 'IMAGE' ? 'Image' : 'Video'} · max 100 MB`}
+                              : `Upload ${selectedTemplate.headerType === 'IMAGE' ? 'Image' : 'Video'} · max 15 MB`}
                           </span>
                           <input
                             hidden
