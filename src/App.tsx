@@ -13,9 +13,10 @@ import { CampaignHistory } from './components/CampaignHistory';
 import { Login } from './components/Login';
 import { TemplateManager } from './components/TemplateManager';
 import { TestMessageDialog } from './components/TestMessageDialog';
-import { cancelCampaign, getCampaigns, getCampaignStatus, getContacts, getRecurringCampaigns, getTemplates, rescheduleCampaign, sendCampaign, updateRecurringCampaign } from './lib/api';
+import { SeriesSelectionPanel } from './components/SeriesSelectionPanel';
+import { cancelCampaign, getCampaigns, getCampaignStatus, getContacts, getMessageSeries, getMessageSeriesSchedules, getRecurringCampaigns, getTemplates, rescheduleCampaign, scheduleMessageSeries, sendCampaign, updateMessageSeriesSchedule, updateRecurringCampaign } from './lib/api';
 import { supabase } from './lib/supabase';
-import type { CampaignSummary, Contact, RecipientStatus, RecurringCampaignSummary, WhatsAppTemplate } from './types';
+import type { CampaignSummary, Contact, MessageSeries, MessageSeriesScheduleSummary, RecipientStatus, RecurringCampaignSummary, WhatsAppTemplate } from './types';
 
 export default function App() {
   const [session, setSession] = useState<Session | null>(null);
@@ -23,6 +24,8 @@ export default function App() {
   const [page, setPage] = useState<AppPage>('whatsapp');
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [templates, setTemplates] = useState<WhatsAppTemplate[]>([]);
+  const [messageSeries, setMessageSeries] = useState<MessageSeries[]>([]);
+  const [selectedSeriesId, setSelectedSeriesId] = useState('');
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [selectedTemplateId, setSelectedTemplateId] = useState('');
   const [variables, setVariables] = useState<Record<string,string>>({});
@@ -44,6 +47,7 @@ export default function App() {
   const [historyOpen, setHistoryOpen] = useState(false);
   const [campaigns, setCampaigns] = useState<CampaignSummary[]>([]);
   const [recurringCampaigns, setRecurringCampaigns] = useState<RecurringCampaignSummary[]>([]);
+  const [messageSeriesSchedules, setMessageSeriesSchedules] = useState<MessageSeriesScheduleSummary[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyError, setHistoryError] = useState('');
   const [templateManagerOpen, setTemplateManagerOpen] = useState(false);
@@ -54,7 +58,9 @@ export default function App() {
     [contacts, selected],
   );
   const template = templates.find((item) => item.id === selectedTemplateId);
-  const currentStep = campaignId ? 4 : template ? 3 : selected.size ? 2 : 1;
+  const selectedSeries = messageSeries.find((item) => item.id === selectedSeriesId);
+  const contentSelected = deliveryMode === 'series' ? Boolean(selectedSeries) : Boolean(template);
+  const currentStep = campaignId ? 4 : contentSelected ? 3 : selected.size ? 2 : 1;
 
   useEffect(() => {
     if (!supabase) return;
@@ -103,10 +109,23 @@ export default function App() {
     }
   };
 
+  const refreshMessageSeries = async () => {
+    try {
+      const data = await getMessageSeries();
+      setMessageSeries(data.series);
+      setSelectedSeriesId((current) =>
+        data.series.some((item) => item.id === current && item.status === 'READY') ? current : ''
+      );
+    } catch (err) {
+      setTemplateError(err instanceof Error ? err.message : 'Unable to load message series.');
+    }
+  };
+
   useEffect(() => {
     if (!authReady || (supabase && !session)) return;
     void refreshContacts();
     void refreshTemplates();
+    void refreshMessageSeries();
   }, [authReady, session?.user.id]);
 
   useEffect(() => {
@@ -137,8 +156,36 @@ export default function App() {
 
   const send = async () => {
     if (!campaignName.trim()) return setError('Enter a campaign name.');
-    if (!template) return setError('Choose an approved WhatsApp template.');
     if (!chosenContacts.length) return setError('Select at least one active contact.');
+
+    if (deliveryMode === 'series') {
+      if (!selectedSeries) return setError('Choose a ready Message Series.');
+      if (!scheduledAt) return setError('Choose the first send date and time for the series.');
+
+      setSending(true);
+      setError('');
+      try {
+        await scheduleMessageSeries({
+          name: campaignName,
+          seriesId: selectedSeries.id,
+          contactIds: chosenContacts.map((contact) => contact.id),
+          startAt: new Date(scheduledAt).toISOString(),
+          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
+        });
+
+        const schedulesData = await getMessageSeriesSchedules();
+        setMessageSeriesSchedules(schedulesData.schedules);
+        setCampaignId('');
+        setStatusRows([]);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Unable to schedule message series.');
+      } finally {
+        setSending(false);
+      }
+      return;
+    }
+
+    if (!template) return setError('Choose an approved WhatsApp template.');
     if (
       template.variables > 0 &&
       Array.from({ length: template.variables }, (_, i) => variables[String(i + 1)])
@@ -192,12 +239,14 @@ export default function App() {
     setHistoryLoading(true);
     setHistoryError('');
     try {
-      const [campaignData, recurringData] = await Promise.all([
+      const [campaignData, recurringData, seriesScheduleData] = await Promise.all([
         getCampaigns(),
         getRecurringCampaigns(),
+        getMessageSeriesSchedules(),
       ]);
       setCampaigns(campaignData.campaigns);
       setRecurringCampaigns(recurringData.recurringCampaigns);
+      setMessageSeriesSchedules(seriesScheduleData.schedules);
     } catch (err) {
       setHistoryError(err instanceof Error ? err.message : 'Unable to load campaign history.');
     } finally {
@@ -228,6 +277,15 @@ export default function App() {
     await updateRecurringCampaign(campaign.id, action);
     const data = await getRecurringCampaigns();
     setRecurringCampaigns(data.recurringCampaigns);
+  };
+
+  const updateSeriesSchedule = async (
+    schedule: MessageSeriesScheduleSummary,
+    action: 'pause' | 'resume' | 'cancel',
+  ) => {
+    await updateMessageSeriesSchedule(schedule.id, action);
+    const data = await getMessageSeriesSchedules();
+    setMessageSeriesSchedules(data.schedules);
   };
 
   if (!authReady) return <div className="app-loading">Loading…</div>;
@@ -291,7 +349,7 @@ export default function App() {
               {error && <div className="alert">{error}</div>}
 
               <div className="progress">
-                {[['1','Select Contacts'],['2','Choose Template'],['3','Compose & Preview'],['4','Send & Track']]
+                {[['1','Select Contacts'],['2','Choose Content'],['3','Compose & Preview'],['4','Send & Track']]
                   .map(([step,label], index) => (
                     <div key={step} style={{display:'contents'}}>
                       <div className={`progress-item ${currentStep === Number(step) ? 'active' : currentStep > Number(step) ? 'complete' : ''}`}>
@@ -331,6 +389,19 @@ export default function App() {
                 </div>
 
                 <div className="right-col">
+                  {deliveryMode === 'series' ? (
+                    <SeriesSelectionPanel
+                      series={messageSeries}
+                      selectedId={selectedSeriesId}
+                      onSelect={(id) => {
+                        setSelectedSeriesId(id);
+                        setCampaignId('');
+                        setStatusRows([]);
+                      }}
+                      templates={templates}
+                    />
+                  ) : (
+                    <>
                   <TemplatePanel
                     templates={templates}
                     selectedId={selectedTemplateId}
@@ -356,28 +427,42 @@ export default function App() {
                     contact={chosenContacts[0]}
                     mediaUrl={mediaUrl}
                   />
+                    </>
+                  )}
                   <div className="campaign-action-row">
-                    <button
-                      className="btn test-send-btn"
-                      onClick={() => setTestMessageOpen(true)}
-                      disabled={!template}
-                    >
-                      <Send size={17}/> Send Test Message
-                    </button>
+                    {deliveryMode !== 'series' ? (
+                      <button
+                        className="btn test-send-btn"
+                        onClick={() => setTestMessageOpen(true)}
+                        disabled={!template}
+                      >
+                        <Send size={17}/> Send Test Message
+                      </button>
+                    ) : (
+                      <div className="series-send-info">
+                        {selectedSeries ? selectedSeries.steps.length + ' different daily messages' : 'Choose a message series'}
+                      </div>
+                    )}
                     <button className="send-btn campaign-send-btn" onClick={send} disabled={sending}>
                       <Send size={19}/>
                       {sending
                         ? 'Processing…'
-                        : deliveryMode === 'daily'
-                          ? 'Schedule Daily Campaign'
-                          : deliveryMode === 'once'
-                            ? 'Schedule WhatsApp Campaign'
-                            : 'Send WhatsApp Message'}
+                        : deliveryMode === 'series'
+                          ? 'Schedule Message Series'
+                          : deliveryMode === 'daily'
+                            ? 'Schedule Daily Campaign'
+                            : deliveryMode === 'once'
+                              ? 'Schedule WhatsApp Campaign'
+                              : 'Send WhatsApp Message'}
                     </button>
                   </div>
                   <div className="send-meta">
-                    Selected contacts: <b>{selected.size}</b> &nbsp;|&nbsp; Template:{' '}
-                    <b>{template ? `${template.name} · ${template.language}` : '—'}</b>
+                    Selected contacts: <b>{selected.size}</b> &nbsp;|&nbsp; {deliveryMode === 'series' ? 'Series' : 'Template'}:{' '}
+                    <b>
+                      {deliveryMode === 'series'
+                        ? selectedSeries?.name || '—'
+                        : template ? `${template.name} · ${template.language}` : '—'}
+                    </b>
                   </div>
                 </div>
               </div>
@@ -392,17 +477,22 @@ export default function App() {
         open={historyOpen}
         campaigns={campaigns}
         recurringCampaigns={recurringCampaigns}
+        messageSeriesSchedules={messageSeriesSchedules}
         loading={historyLoading}
         error={historyError}
         onClose={() => setHistoryOpen(false)}
         onCancel={cancelScheduledCampaign}
         onReschedule={rescheduleScheduledCampaign}
         onRecurringAction={updateRecurringSchedule}
+        onMessageSeriesAction={updateSeriesSchedule}
       />
       <TemplateManager
         open={templateManagerOpen}
         onClose={() => setTemplateManagerOpen(false)}
-        onChanged={refreshTemplates}
+        onChanged={async () => {
+          await refreshTemplates();
+          await refreshMessageSeries();
+        }}
       />
       <TestMessageDialog
         open={testMessageOpen}
