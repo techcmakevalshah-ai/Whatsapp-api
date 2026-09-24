@@ -426,7 +426,7 @@ export default function App() {
           <div className="user">
             <Bell size={18}/>
             <span className="avatar">
-              {(profile?.fullName || profile?.email || 'Staff')
+              {(profile?.fullName || profile?.email || 'Team')
                 .split(/\s+/)
                 .filter(Boolean)
                 .slice(0, 2)
@@ -434,8 +434,8 @@ export default function App() {
                 .join('') || 'ST'}
             </span>
             <div className="topbar-profile">
-              <b>{profile?.fullName || profile?.email || 'Local Staff'}</b>
-              <span>{profile?.role === 'admin' ? 'Admin' : 'Staff'}</span>
+              <b>{profile?.fullName || profile?.email || 'Local Team'}</b>
+              <span>{profile?.role === 'admin' ? 'Admin' : 'Team'}</span>
             </div>
             <ChevronDown size={15}/>
             {supabase && (

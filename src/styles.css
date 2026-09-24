@@ -278,7 +278,7 @@
 .user-profile-cell span{font-size:10px;color:#64748b}
 .user-role-avatar{width:30px;height:30px;border-radius:9px;display:grid;place-items:center;flex:0 0 auto}
 .user-role-avatar.admin{background:#f5f0ff;color:#6d28d9}.user-role-avatar.staff{background:#eef4ff;color:#315caa}
-.admin-pill{background:#f3e8ff;color:#6b21a8}.staff-pill{background:#e8f0ff;color:#2454b8}
+.admin-pill{background:#f3e8ff;color:#6b21a8}.team-pill{background:#e8f0ff;color:#2454b8}
 .user-row-actions{display:flex;gap:6px;align-items:center}
 .user-row-actions .btn{padding:6px 8px;font-size:10px}
 .user-reactivate-btn{background:#effaf2;border:1px solid #bbf7d0;color:#166534}

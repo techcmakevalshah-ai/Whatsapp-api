@@ -4,8 +4,8 @@ React/Vite dashboard for sending WhatsApp Official template campaigns to contact
 
 ## Architecture
 
-- **React + Vite** — staff dashboard
-- **Supabase Auth** — staff login
+- **React + Vite** — team dashboard
+- **Supabase Auth** — team login
 - **Supabase Postgres** — campaign/recipient history and delivery state
 - **Google Sheets API** — live contact source
 - **Vercel Functions** — secure backend endpoints
@@ -16,7 +16,7 @@ The WhatsApp implementation is isolated in `server/whatsapp.ts`. When the curren
 
 ## Security model
 
-The browser never receives Google service-account credentials, Supabase service-role keys, or WhatsApp access tokens. Every staff API endpoint validates the Supabase access token. The send endpoint also reloads the Google Sheet and re-checks `Opt-In` and `Active` status before a number can be queued.
+The browser never receives Google service-account credentials, Supabase service-role keys, or WhatsApp access tokens. Every team API endpoint validates the Supabase access token. The send endpoint also reloads the Google Sheet and re-checks `Opt-In` and `Active` status before a number can be queued.
 
 Do not expose `SUPABASE_SERVICE_ROLE_KEY`, `GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY`, or `WHATSAPP_ACCESS_TOKEN` in a `VITE_` variable.
 
@@ -56,7 +56,7 @@ npm install
 ```
 
 3. Apply `supabase/migrations/001_whatsapp_campaigns.sql` to your Supabase project.
-4. Create staff users in Supabase Auth. Disable public signup if this is staff-only.
+4. Create team users in Supabase Auth. Disable public signup if this is team-only.
 5. Run locally:
 
 ```bash

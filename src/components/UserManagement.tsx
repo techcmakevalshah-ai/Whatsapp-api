@@ -34,7 +34,7 @@ export function UserManagement({
     const term = query.trim().toLowerCase();
     if (!term) return users;
     return users.filter((user) =>
-      `${user.fullName} ${user.email} ${user.role} ${user.active ? 'active' : 'revoked'}`
+      `${user.fullName} ${user.email} ${user.role === 'admin' ? 'admin' : 'team'} ${user.active ? 'active' : 'revoked'}`
         .toLowerCase()
         .includes(term),
     );
@@ -74,11 +74,12 @@ export function UserManagement({
     const fullName = window.prompt('Full name', user.fullName)?.trim();
     if (!fullName) return;
 
-    const roleAnswer = window.prompt('Role: admin or staff', user.role)?.trim().toLowerCase();
-    if (!roleAnswer || !['admin', 'staff'].includes(roleAnswer)) {
-      setLocalError('Role must be admin or staff.');
+    const roleAnswer = window.prompt('Role: admin or team', user.role === 'admin' ? 'admin' : 'team')?.trim().toLowerCase();
+    if (!roleAnswer || !['admin', 'team'].includes(roleAnswer)) {
+      setLocalError('Role must be admin or team.');
       return;
     }
+    const internalRole = roleAnswer === 'admin' ? 'admin' : 'staff';
 
     setBusyId(user.id);
     setLocalError('');
@@ -87,7 +88,7 @@ export function UserManagement({
       await updateStaffUser(user.id, {
         action: 'update_profile',
         fullName,
-        role: roleAnswer as 'admin' | 'staff',
+        role: internalRole as 'admin' | 'staff',
       });
       setSuccess(`${user.email} profile updated.`);
       await onRefresh();
@@ -177,7 +178,7 @@ export function UserManagement({
       <div className="contacts-page-head">
         <div>
           <h1>Users & Access</h1>
-          <p>Create staff or admin profiles and revoke access without deleting historical data.</p>
+          <p>Create team or admin profiles and revoke access without deleting historical data.</p>
         </div>
         <div className="admin-profile-badge">
           <ShieldCheck size={18}/>
@@ -227,7 +228,7 @@ export function UserManagement({
                 role: event.target.value as 'admin' | 'staff',
               }))}
             >
-              <option value="staff">Staff User</option>
+              <option value="staff">Team User</option>
               <option value="admin">Admin</option>
             </select>
           </label>
@@ -239,7 +240,7 @@ export function UserManagement({
         </form>
 
         <div className="user-invite-note">
-          New users receive a Supabase email invitation and set their own password. Admin users can manage access; staff users cannot open this page.
+          New users receive a Supabase email invitation and set their own password. Admin users can manage access; team users cannot open this page.
         </div>
       </section>
 
@@ -293,8 +294,8 @@ export function UserManagement({
                       </div>
                     </td>
                     <td>
-                      <span className={`pill ${user.role === 'admin' ? 'admin-pill' : 'staff-pill'}`}>
-                        {user.role === 'admin' ? 'Admin' : 'Staff'}
+                      <span className={`pill ${user.role === 'admin' ? 'admin-pill' : 'team-pill'}`}>
+                        {user.role === 'admin' ? 'Admin' : 'Team'}
                       </span>
                     </td>
                     <td>

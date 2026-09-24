@@ -23,7 +23,7 @@ export function Login() {
       <form className="login-card" onSubmit={submit}>
         <div className="login-icon"><MessageCircleMore size={28} /></div>
         <h1>WhatsApp Campaign</h1>
-        <p>Staff login</p>
+        <p>Team login</p>
         {error && <div className="alert">{error}</div>}
         <label>Email<input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" /></label>
         <label>Password<input type="password" required value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" /></label>

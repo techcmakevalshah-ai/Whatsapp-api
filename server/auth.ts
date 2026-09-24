@@ -46,7 +46,7 @@ export async function requireStaff(req: VercelRequest, res: VercelResponse): Pro
       .maybeSingle();
 
     if (staffError) {
-      throw new Error(`Unable to verify staff access: ${staffError.message}`);
+      throw new Error(`Unable to verify team access: ${staffError.message}`);
     }
 
     if (!staff) {
