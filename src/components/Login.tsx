@@ -22,8 +22,8 @@ export function Login() {
     <div className="login-page">
       <form className="login-card" onSubmit={submit}>
         <div className="login-icon"><MessageCircleMore size={28} /></div>
-        <h1>WhatsApp Campaign</h1>
-        <p>Team login</p>
+        <h1>Jai Dholera Team Portal</h1>
+        <p>Secure team login</p>
         {error && <div className="alert">{error}</div>}
         <label>Email<input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" /></label>
         <label>Password<input type="password" required value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" /></label>
