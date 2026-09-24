@@ -124,7 +124,7 @@ async function serializeUsers(sb: ReturnType<typeof supabaseAdmin>) {
 }
 
 function appUrl() {
-  return 'https://whatsapp.jaidholera.com';
+  return 'https://aw.jaidholera.com';
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {

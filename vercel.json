@@ -8,10 +8,34 @@
         {
           "type": "header",
           "key": "host",
+          "value": "whatsapp.jaidholera.com"
+        }
+      ],
+      "destination": "https://aw.jaidholera.com/:path*",
+      "permanent": true
+    },
+    {
+      "source": "/:path*",
+      "has": [
+        {
+          "type": "header",
+          "key": "host",
           "value": "www.whatsapp.jaidholera.com"
         }
       ],
-      "destination": "https://whatsapp.jaidholera.com/:path*",
+      "destination": "https://aw.jaidholera.com/:path*",
+      "permanent": true
+    },
+    {
+      "source": "/:path*",
+      "has": [
+        {
+          "type": "header",
+          "key": "host",
+          "value": "www.aw.jaidholera.com"
+        }
+      ],
+      "destination": "https://aw.jaidholera.com/:path*",
       "permanent": true
     }
   ],
