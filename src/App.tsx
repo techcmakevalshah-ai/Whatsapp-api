@@ -35,8 +35,12 @@ export default function App() {
   const [profileError, setProfileError] = useState('');
   const [inviteMode, setInviteMode] = useState(() => {
     if (typeof window === 'undefined') return false;
-    return new URLSearchParams(window.location.search).get('invite') === '1'
-      || window.location.hash.includes('type=invite');
+    const search = new URLSearchParams(window.location.search);
+    const hash = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+    return search.get('invite') === '1'
+      || search.get('type') === 'invite'
+      || hash.get('type') === 'invite'
+      || (search.get('invite') === '1' && Boolean(hash.get('access_token')));
   });
   const [page, setPage] = useState<AppPage>('dashboard');
   const [contacts, setContacts] = useState<Contact[]>([]);
@@ -381,10 +385,14 @@ export default function App() {
     setMessageSeriesSchedules(data.schedules);
   };
 
+  if (inviteMode) {
+    return <InvitePasswordSetup onComplete={() => setInviteMode(false)} />;
+  }
+
   if (!authReady || (session && !profileReady)) return <div className="app-loading">Loading…</div>;
   if (supabase && !session) return <Login />;
 
-  if (session && (inviteMode || profile?.mustSetPassword)) {
+  if (session && profile?.mustSetPassword) {
     return <InvitePasswordSetup onComplete={() => setInviteMode(false)} />;
   }
 
