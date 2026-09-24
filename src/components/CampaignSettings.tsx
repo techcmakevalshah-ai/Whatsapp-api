@@ -119,7 +119,7 @@ export function CampaignSettings({
                 {deliveryMode === 'daily'
                   ? 'First Send Date & Time'
                   : deliveryMode === 'series'
-                    ? 'First Series Send Date & Time'
+                    ? 'Series Start Date & Default Time'
                     : 'Send Date & Time'}
               </span>
               <input
@@ -181,7 +181,7 @@ export function CampaignSettings({
             {deliveryMode === 'daily'
               ? 'The same approved template, variables and media will be used each day. Only contacts that are still Active in Google Sheets at send time will receive that day’s message.'
               : deliveryMode === 'series'
-                ? 'Each day uses the separate template, variables and media configured in Manage Templates → Series Messages. Only contacts still Active in Google Sheets receive that day’s message.'
+                ? 'Each day uses its own template, variables, media and optional Send Time from Manage Templates → Series Messages. A blank day time uses this campaign default time. Only contacts still Active in Google Sheets receive that day’s message.'
                 : 'Scheduled campaigns are checked every minute. You can cancel or reschedule them from Campaign History until sending starts.'}
           </div>
         </div>

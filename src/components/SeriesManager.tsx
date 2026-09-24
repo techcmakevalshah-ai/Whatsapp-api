@@ -1,4 +1,4 @@
-import { Ban, Copy, Image as ImageIcon, Pencil, Plus, Save, Trash2, Upload } from 'lucide-react';
+import { Ban, Clock3, Copy, Image as ImageIcon, Pencil, Plus, Save, Trash2, Upload } from 'lucide-react';
 import { useEffect, useMemo, useState, type ChangeEvent } from 'react';
 import {
   createMessageSeries,
@@ -46,6 +46,7 @@ function emptyStep(dayNumber: number): EditableStep {
     headerType: null,
     mediaUrl: null,
     variableValues: {},
+    sendTime: null,
   };
 }
 
@@ -344,7 +345,7 @@ export function SeriesManager({
         <div className="series-builder-head">
           <div>
             <h3>{editingId ? 'Edit Message Series' : 'Create Message Series'}</h3>
-            <p>Different approved WhatsApp message for each day, up to 90 days.</p>
+            <p>Different approved WhatsApp message and optional send time for each day, up to 90 days.</p>
           </div>
           {editingId && (
             <button className="btn secondary" type="button" onClick={reset}>
@@ -398,20 +399,34 @@ export function SeriesManager({
               <article key={step.dayNumber} className="series-step-card">
                 <div className="series-day-badge">Day {step.dayNumber}</div>
 
-                <label className="series-template-select">
-                  <span>Approved Template</span>
-                  <select
-                    value={selectedTemplateId}
-                    onChange={(event) => selectTemplate(index, event.target.value)}
-                  >
-                    <option value="">Choose template</option>
-                    {approvedTemplates.map((template) => (
-                      <option key={template.id} value={template.id}>
-                        {template.name} · {template.language}
-                      </option>
-                    ))}
-                  </select>
-                </label>
+                <div className="series-step-controls">
+                  <label className="series-template-select">
+                    <span>Approved Template</span>
+                    <select
+                      value={selectedTemplateId}
+                      onChange={(event) => selectTemplate(index, event.target.value)}
+                    >
+                      <option value="">Choose template</option>
+                      {approvedTemplates.map((template) => (
+                        <option key={template.id} value={template.id}>
+                          {template.name} · {template.language}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <label className="series-send-time-field">
+                    <span><Clock3 size={13}/> Send Time <small>(optional)</small></span>
+                    <input
+                      type="time"
+                      value={step.sendTime ? step.sendTime.slice(0, 5) : ''}
+                      onChange={(event) => setStep(index, {
+                        sendTime: event.target.value || null,
+                      })}
+                    />
+                    <small>Blank = use campaign default time</small>
+                  </label>
+                </div>
 
                 {selectedTemplate && (
                   <>
@@ -563,7 +578,10 @@ export function SeriesManager({
 
                 <div className="series-mini-days">
                   {series.steps.slice(0, 6).map((step) => (
-                    <span key={step.dayNumber}>D{step.dayNumber}: {step.templateName}</span>
+                    <span key={step.dayNumber}>
+                      D{step.dayNumber}: {step.templateName}
+                      {step.sendTime ? ` · ${step.sendTime.slice(0, 5)}` : ' · Default time'}
+                    </span>
                   ))}
                   {series.steps.length > 6 && <span>+{series.steps.length - 6} more</span>}
                 </div>

@@ -10,6 +10,7 @@ type IncomingStep = {
   templateLanguage?: string;
   mediaUrl?: string | null;
   variableValues?: Record<string, string>;
+  sendTime?: string | null;
 };
 
 function validTimezone(value: string) {
@@ -21,11 +22,22 @@ function validTimezone(value: string) {
   }
 }
 
+function normalizeSendTime(value: unknown) {
+  const raw = String(value || '').trim();
+  if (!raw) return null;
+  if (!/^([01]\d|2[0-3]):[0-5]\d(?::[0-5]\d)?$/.test(raw)) {
+    throw new Error('Send time must be a valid 24-hour time.');
+  }
+  return raw.length === 5 ? `${raw}:00` : raw;
+}
+
 function validateSteps(steps: IncomingStep[]) {
   if (!Array.isArray(steps) || !steps.length) {
     throw new Error('Add at least one day to the message series.');
   }
   if (steps.length > 90) throw new Error('A message series can contain at most 90 days.');
+
+  for (const step of steps) normalizeSendTime(step.sendTime);
 
   const days = steps.map((step) => Number(step.dayNumber)).sort((a, b) => a - b);
   for (let index = 0; index < days.length; index += 1) {
@@ -75,6 +87,7 @@ async function validateTemplates(sb: ReturnType<typeof supabaseAdmin>, steps: In
       ...step,
       templateLanguage: language,
       headerType: template.header_type || null,
+      sendTime: normalizeSendTime(step.sendTime),
     };
   });
 }
@@ -96,7 +109,7 @@ async function serializeSeries(sb: ReturnType<typeof supabaseAdmin>, ownerId?: s
   if (ids.length) {
     const { data, error: stepsError } = await sb
       .from('message_series_steps')
-      .select('id, series_id, day_number, template_name, template_language, header_type, media_url, variable_values, active')
+      .select('id, series_id, day_number, template_name, template_language, header_type, media_url, variable_values, send_time, active')
       .in('series_id', ids)
       .eq('active', true)
       .order('day_number', { ascending: true });
@@ -116,6 +129,7 @@ async function serializeSeries(sb: ReturnType<typeof supabaseAdmin>, ownerId?: s
       headerType: step.header_type,
       mediaUrl: step.media_url,
       variableValues: step.variable_values || {},
+      sendTime: step.send_time,
     });
     bySeries.set(step.series_id, list);
   }
@@ -177,10 +191,6 @@ async function createSchedule(
   if (Number.isNaN(startDate.getTime())) {
     return res.status(400).json({ error: 'Choose a valid first send date and time.' });
   }
-  if (startDate.getTime() <= Date.now() + 60_000) {
-    return res.status(400).json({ error: 'First send time must be at least 1 minute in the future.' });
-  }
-
   const timezoneValue = String(timezone || 'UTC').trim() || 'UTC';
   if (!validTimezone(timezoneValue)) {
     return res.status(400).json({ error: 'Invalid timezone.' });
@@ -200,7 +210,7 @@ async function createSchedule(
 
   const { data: steps, error: stepsError } = await sb
     .from('message_series_steps')
-    .select('day_number')
+    .select('day_number, send_time')
     .eq('series_id', series.id)
     .eq('active', true)
     .order('day_number', { ascending: true });
@@ -213,6 +223,26 @@ async function createSchedule(
     if (Number(steps[index].day_number) !== index + 1) {
       return res.status(400).json({ error: 'Message series days must be continuous from Day 1.' });
     }
+  }
+
+  const { data: firstRunAt, error: firstRunError } = await sb.rpc(
+    'resolve_message_series_run_at',
+    {
+      p_reference: startDate.toISOString(),
+      p_timezone: timezoneValue,
+      p_send_time: steps[0]?.send_time || null,
+    },
+  );
+  if (firstRunError) throw firstRunError;
+
+  const firstRunDate = new Date(String(firstRunAt || startDate.toISOString()));
+  if (Number.isNaN(firstRunDate.getTime())) {
+    return res.status(400).json({ error: 'Unable to calculate the Day 1 send time.' });
+  }
+  if (firstRunDate.getTime() <= Date.now() + 60_000) {
+    return res.status(400).json({
+      error: 'Day 1 send time must be at least 1 minute in the future.',
+    });
   }
 
   const liveContacts = await fetchSheetContacts();
@@ -237,7 +267,7 @@ async function createSchedule(
     name: String(name).trim().slice(0, 120),
     timezone: timezoneValue,
     start_at: startDate.toISOString(),
-    next_run_at: startDate.toISOString(),
+    next_run_at: firstRunDate.toISOString(),
     total_days: steps.length,
     runs_created: 0,
     status: 'active',
@@ -267,7 +297,7 @@ async function createSchedule(
     seriesName: series.name,
     totalDays: steps.length,
     eligibleCount: selectedContacts.length,
-    nextRunAt: startDate.toISOString(),
+    nextRunAt: firstRunDate.toISOString(),
   });
 }
 
@@ -445,6 +475,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           header_type: step.headerType || null,
           media_url: String(step.mediaUrl || '').trim() || null,
           variable_values: step.variableValues || {},
+          send_time: normalizeSendTime(step.sendTime),
           active: true,
           updated_at: now,
         };

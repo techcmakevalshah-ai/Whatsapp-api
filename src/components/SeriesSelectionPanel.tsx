@@ -100,6 +100,7 @@ export function SeriesSelectionPanel({
                         <small>
                           {step.templateLanguage}
                           {step.headerType ? ' · ' + step.headerType : ''}
+                          {step.sendTime ? ' · Send ' + step.sendTime.slice(0, 5) : ' · Default time'}
                         </small>
                       </div>
 

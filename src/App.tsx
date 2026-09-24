@@ -254,7 +254,7 @@ export default function App() {
 
     if (deliveryMode === 'series') {
       if (!selectedSeries) return setError('Choose a ready Message Series.');
-      if (!scheduledAt) return setError('Choose the first send date and time for the series.');
+      if (!scheduledAt) return setError('Choose the series start date and default time.');
 
       setSending(true);
       setError('');

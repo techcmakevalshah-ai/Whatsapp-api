@@ -89,6 +89,7 @@ export type MessageSeriesStep = {
   headerType?: 'IMAGE' | 'VIDEO' | null;
   mediaUrl?: string | null;
   variableValues: Record<string, string>;
+  sendTime?: string | null;
 };
 
 export type MessageSeries = {

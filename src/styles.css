@@ -181,8 +181,15 @@
 .series-step-list{display:flex;flex-direction:column;gap:12px;max-height:62vh;overflow:auto;padding-right:3px}
 .series-step-card{position:relative;border:1px solid #dfe6ef;background:#fff;border-radius:10px;padding:14px}
 .series-day-badge{position:absolute;top:12px;right:12px;background:#ede9fe;color:#5b21b6;border-radius:999px;padding:4px 9px;font-size:10px;font-weight:800}
-.series-template-select{display:flex;flex-direction:column;gap:6px;width:min(520px,calc(100% - 80px));font-size:11px;font-weight:750;color:#334155}
+.series-step-controls{display:grid;grid-template-columns:minmax(0,1fr) 190px;gap:12px;align-items:start;padding-right:80px}
+.series-template-select{display:flex;flex-direction:column;gap:6px;width:100%;font-size:11px;font-weight:750;color:#334155}
 .series-template-select select{width:100%}
+.series-send-time-field{display:flex;flex-direction:column;gap:6px;font-size:11px;font-weight:750;color:#334155}
+.series-send-time-field>span{display:flex;align-items:center;gap:5px}
+.series-send-time-field>span small{font-weight:600;color:#8a96a8}
+.series-send-time-field input{width:100%;border:1px solid #dbe3ec;border-radius:8px;padding:9px 10px;background:#fff;font:inherit;color:#26364d;outline:none}
+.series-send-time-field input:focus{border-color:#9db0de;box-shadow:0 0 0 3px rgba(49,92,201,.08)}
+.series-send-time-field>small{font-size:9px;font-weight:600;color:#8a96a8}
 .series-template-preview{margin-top:10px;border:1px solid #e7ebf1;background:#f8fafc;border-radius:8px;padding:10px;display:flex;flex-direction:column;gap:3px}
 .series-template-preview b{font-size:12px;color:#172033}.series-template-preview small{font-size:10px;color:#718096}.series-template-preview div{white-space:pre-wrap;font-size:11px;line-height:1.45;color:#43526a;margin-top:4px}
 .series-variable-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
@@ -1296,4 +1303,9 @@ tbody tr:hover{background:#fafcff}
   .series-schedule-success-row>div:first-child{
     display:none;
   }
+}
+
+@media(max-width:700px){
+  .series-step-controls{grid-template-columns:1fr;padding-right:0}
+  .series-day-badge{position:static;display:inline-flex;margin-bottom:10px}
 }
