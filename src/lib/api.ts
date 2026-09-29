@@ -1,5 +1,5 @@
 import { supabase } from './supabase';
-import type { CampaignSummary, Contact, DashboardStats, ManagedWhatsAppTemplate, MessageSeries, MessageSeriesScheduleSummary, MessageSeriesStep, RecipientStatus, RecurringCampaignSummary, StaffProfile, StaffUserProfile, TemplateFolder, WhatsAppTemplate } from '../types';
+import type { CampaignSummary, Contact, ContactSource, DashboardStats, ManagedWhatsAppTemplate, MessageSeries, MessageSeriesScheduleSummary, MessageSeriesStep, RecipientStatus, RecurringCampaignSummary, StaffProfile, StaffUserProfile, TemplateFolder, WhatsAppTemplate } from '../types';
 
 async function json<T>(url: string, init?: RequestInit): Promise<T> {
   const headers = new Headers(init?.headers);
@@ -20,8 +20,8 @@ async function json<T>(url: string, init?: RequestInit): Promise<T> {
   return body as T;
 }
 
-export function getContacts(): Promise<{ contacts: Contact[]; syncedAt: string }> {
-  return json('/api/contacts');
+export function getContacts(source: ContactSource = 'sheet'): Promise<{ contacts: Contact[]; source: ContactSource; syncedAt: string }> {
+  return json('/api/contacts?source=' + encodeURIComponent(source));
 }
 
 export function getTemplates(): Promise<{ templates: WhatsAppTemplate[] }> {
@@ -38,6 +38,7 @@ export function sendCampaign(payload: {
   timezone?: string;
   recurrenceDays?: number;
   mediaUrl?: string;
+  contactSource?: ContactSource;
 }): Promise<{
   campaignId?: string;
   recurring?: boolean;
@@ -209,6 +210,7 @@ export function scheduleMessageSeries(payload: {
   contactIds: string[];
   startAt: string;
   timezone: string;
+  contactSource?: ContactSource;
 }): Promise<{
   ok: true;
   scheduleId: string;

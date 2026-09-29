@@ -1,9 +1,12 @@
+export type ContactSource = 'sheet' | 'flowlu';
+
 export type Contact = {
   id: string;
   name: string;
   phone: string;
   category: string;
   status: 'Active' | 'Inactive';
+  source?: ContactSource;
 };
 
 export type WhatsAppTemplate = {

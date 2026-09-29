@@ -1,11 +1,12 @@
 import { Filter, Search } from 'lucide-react';
 import { useMemo, useState } from 'react';
-import type { Contact } from '../types';
+import type { Contact, ContactSource } from '../types';
 
 type FilterMode = 'all' | 'active' | 'inactive';
 
-export function ContactsTable({ contacts, selected, onToggle, onToggleAll, query, setQuery }: {
+export function ContactsTable({ contacts, source, selected, onToggle, onToggleAll, query, setQuery }: {
   contacts: Contact[];
+  source: ContactSource;
   selected: Set<string>;
   onToggle: (id: string) => void;
   onToggleAll: (ids: string[]) => void;
@@ -50,7 +51,7 @@ export function ContactsTable({ contacts, selected, onToggle, onToggleAll, query
 
   return (
     <section className="card contacts-card">
-      <div className="section-title"><span className="step blue">2</span> Contacts from Google Sheet</div>
+      <div className="section-title"><span className="step blue">2</span> Contacts from {source === 'flowlu' ? 'Flowlu CRM' : 'Excel Sheet'}</div>
 
       <div className="toolbar contact-filter-toolbar">
         <div className="search">

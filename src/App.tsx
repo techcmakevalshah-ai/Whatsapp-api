@@ -19,7 +19,7 @@ import { UserManagement } from './components/UserManagement';
 import { InvitePasswordSetup } from './components/InvitePasswordSetup';
 import { cancelCampaign, getCampaigns, getCampaignStatus, getContacts, getCurrentStaffProfile, getDashboardStats, getMessageSeries, getMessageSeriesSchedules, getRecurringCampaigns, getStaffUsers, getTemplates, rescheduleCampaign, scheduleMessageSeries, sendCampaign, updateMessageSeriesSchedule, updateRecurringCampaign } from './lib/api';
 import { supabase } from './lib/supabase';
-import type { CampaignSummary, Contact, DashboardStats, MessageSeries, MessageSeriesScheduleSummary, RecipientStatus, RecurringCampaignSummary, StaffProfile, StaffUserProfile, WhatsAppTemplate } from './types';
+import type { CampaignSummary, Contact, ContactSource, DashboardStats, MessageSeries, MessageSeriesScheduleSummary, RecipientStatus, RecurringCampaignSummary, StaffProfile, StaffUserProfile, WhatsAppTemplate } from './types';
 
 export default function App() {
   const [session, setSession] = useState<Session | null>(null);
@@ -44,6 +44,7 @@ export default function App() {
   });
   const [page, setPage] = useState<AppPage>('dashboard');
   const [contacts, setContacts] = useState<Contact[]>([]);
+  const [contactSource, setContactSource] = useState<ContactSource>('sheet');
   const [templates, setTemplates] = useState<WhatsAppTemplate[]>([]);
   const [messageSeries, setMessageSeries] = useState<MessageSeries[]>([]);
   const [selectedSeriesId, setSelectedSeriesId] = useState('');
@@ -140,17 +141,36 @@ export default function App() {
     setSelected((previous) => new Set([...previous].filter((id) => activeIds.has(id))));
   };
 
-  const refreshContacts = async () => {
+  const refreshContacts = async (source: ContactSource = contactSource) => {
     setLoadingContacts(true);
     setContactError('');
     try {
-      const data = await getContacts();
+      const data = await getContacts(source);
       applyContacts(data.contacts, data.syncedAt);
     } catch (err) {
+      setContacts([]);
+      setSyncedAt('');
+      setSelected(new Set());
       setContactError(err instanceof Error ? err.message : 'Unable to load contacts.');
     } finally {
       setLoadingContacts(false);
     }
+  };
+
+  const changeContactSource = (source: ContactSource) => {
+    if (source === contactSource) {
+      void refreshContacts(source);
+      return;
+    }
+    setContactSource(source);
+    setSelected(new Set());
+    setContacts([]);
+    setSyncedAt('');
+    setQuery('');
+    setCampaignId('');
+    setStatusRows([]);
+    setSeriesScheduleSuccess('');
+    void refreshContacts(source);
   };
 
   const refreshTemplates = async () => {
@@ -265,6 +285,7 @@ export default function App() {
           contactIds: chosenContacts.map((contact) => contact.id),
           startAt: new Date(scheduledAt).toISOString(),
           timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
+          contactSource,
         });
 
         const schedulesData = await getMessageSeriesSchedules();
@@ -317,6 +338,7 @@ export default function App() {
         scheduledAt: deliveryMode !== 'now' && scheduledAt ? new Date(scheduledAt).toISOString() : undefined,
         timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
         recurrenceDays: deliveryMode === 'daily' ? recurrenceDays : undefined,
+        contactSource,
       });
       setCampaignId(data.campaignId || '');
       setStatusRows(data.recurring ? [] : data.recipients);
@@ -428,7 +450,7 @@ export default function App() {
             </span>
             <b>›</b>
             <span>
-              {page === 'dashboard' ? 'Dashboard' : page === 'contacts' ? 'Google Sheet' : page === 'users' ? 'Users & Access' : 'New Campaign'}
+              {page === 'dashboard' ? 'Dashboard' : page === 'contacts' ? (contactSource === 'flowlu' ? 'Flowlu CRM' : 'Excel Sheet') : page === 'users' ? 'Users & Access' : 'New Campaign'}
             </span>
           </div>
           <div className="user">
@@ -486,13 +508,15 @@ export default function App() {
               error={contactError}
               onRefresh={refreshContacts}
               onChanged={applyContacts}
+              source={contactSource}
+              onSourceChange={changeContactSource}
             />
           ) : (
             <>
               <div className="page-head">
                 <div>
                   <h1>WhatsApp Campaign</h1>
-                  <p>Live Google Sheets contacts → WhatsApp Official templates → delivery tracking</p>
+                  <p>{contactSource === 'flowlu' ? 'Flowlu CRM' : 'Excel / Google Sheet'} contacts → WhatsApp Official templates → delivery tracking</p>
                 </div>
                 <button className="btn secondary" onClick={openHistory}>
                   <History size={16}/> Campaign History
@@ -516,13 +540,16 @@ export default function App() {
               <div className="dashboard-grid">
                 <div className="left-col">
                   <GoogleSheetCard
+                    source={contactSource}
                     syncedAt={syncedAt}
                     loading={loadingContacts}
-                    onRefresh={refreshContacts}
+                    onRefresh={() => void refreshContacts(contactSource)}
+                    onSourceChange={changeContactSource}
                     error={contactError}
                   />
                   <ContactsTable
                     contacts={contacts}
+                    source={contactSource}
                     selected={selected}
                     onToggle={toggle}
                     onToggleAll={toggleAll}
