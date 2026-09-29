@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { requireStaff } from '../server/auth.js';
-import { addSheetContact, setSheetContactStatus } from '../server/googleSheets.js';
+import { addSheetContact, fetchSheetContacts, setSheetContactStatus } from '../server/googleSheets.js';
 import { fetchContactsForSource, normalizeContactSource } from '../server/contactSources.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
