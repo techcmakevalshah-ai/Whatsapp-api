@@ -2,7 +2,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import crypto from 'node:crypto';
 import { requireStaff } from '../../server/auth.js';
 import { processCampaignBatch } from '../../server/campaignWorker.js';
-import { fetchSheetContacts } from '../../server/googleSheets.js';
+import { encodeSourceCategory, fetchContactsForSource, normalizeContactSource } from '../../server/contactSources.js';
 import { supabaseAdmin } from '../../server/supabaseAdmin.js';
 import { resolveVariableMap } from '../../server/templateValues.js';
 import { listTemplates } from '../../server/whatsapp.js';
@@ -26,6 +26,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       timezone,
       recurrenceDays,
       mediaUrl,
+      contactSource,
     } = req.body || {};
 
     if (!String(name || '').trim() || !templateName || !Array.isArray(contactIds) || !contactIds.length) {
@@ -46,7 +47,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(400).json({ error: `${template.headerType.toLowerCase()} template requires a public media URL.` });
     }
 
-    const liveContacts = await fetchSheetContacts();
+    const source = normalizeContactSource(contactSource);
+    const liveContacts = await fetchContactsForSource(source);
     const requestedIds = new Set(contactIds.map(String));
     const selectedContacts = liveContacts.filter(
       (contact) => requestedIds.has(contact.id) && contact.status === 'Active',
@@ -127,7 +129,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         recurring_campaign_id: seriesId,
         phone: contact.phone,
         initial_name: contact.name,
-        initial_category: contact.category,
+        initial_category: encodeSourceCategory(source, contact.category),
       }));
 
       const { error: recurringRecipientsError } = await sb

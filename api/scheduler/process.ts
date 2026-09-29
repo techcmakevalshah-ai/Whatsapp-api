@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import crypto from 'node:crypto';
 import { processCampaignBatch } from '../../server/campaignWorker.js';
-import { fetchSheetContacts } from '../../server/googleSheets.js';
+import { contactSourceFromRecipientMarkers, fetchContactsForSource, type ContactSource } from '../../server/contactSources.js';
 import { resolveVariableMap } from '../../server/templateValues.js';
 import { supabaseAdmin } from '../../server/supabaseAdmin.js';
 
@@ -37,7 +37,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     );
     if (recurringClaimError) throw recurringClaimError;
 
-    let liveContacts: Awaited<ReturnType<typeof fetchSheetContacts>> | null = null;
+    const contactCache = new Map<ContactSource, Awaited<ReturnType<typeof fetchContactsForSource>>>();
+    const liveContactsFor = async (source: ContactSource) => {
+      const cached = contactCache.get(source);
+      if (cached) return cached;
+      const contacts = await fetchContactsForSource(source);
+      contactCache.set(source, contacts);
+      return contacts;
+    };
 
     for (const series of claimedSeries || []) {
       try {
@@ -47,12 +54,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         const { data: members, error: membersError } = await sb
           .from('recurring_campaign_recipients')
-          .select('phone')
+          .select('phone, initial_category')
           .eq('recurring_campaign_id', series.id);
 
         if (membersError) throw membersError;
 
-        if (!liveContacts) liveContacts = await fetchSheetContacts();
+        const source = contactSourceFromRecipientMarkers(members || []);
+        const liveContacts = await liveContactsFor(source);
         const allowedPhones = new Set((members || []).map((row: any) => String(row.phone)));
         const activeContacts = liveContacts.filter(
           (contact) => contact.status === 'Active' && allowedPhones.has(contact.phone),
@@ -214,12 +222,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         const { data: members, error: membersError } = await sb
           .from('message_series_schedule_recipients')
-          .select('phone')
+          .select('phone, initial_category')
           .eq('schedule_id', schedule.id);
 
         if (membersError) throw membersError;
 
-        if (!liveContacts) liveContacts = await fetchSheetContacts();
+        const source = contactSourceFromRecipientMarkers(members || []);
+        const liveContacts = await liveContactsFor(source);
         const allowedPhones = new Set((members || []).map((row: any) => String(row.phone)));
         const activeContacts = liveContacts.filter(
           (contact) => contact.status === 'Active' && allowedPhones.has(contact.phone),

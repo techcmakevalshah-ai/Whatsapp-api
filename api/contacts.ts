@@ -1,16 +1,23 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { requireStaff } from '../server/auth.js';
-import { addSheetContact, fetchSheetContacts, setSheetContactStatus } from '../server/googleSheets.js';
+import { addSheetContact, setSheetContactStatus } from '../server/googleSheets.js';
+import { fetchContactsForSource, normalizeContactSource } from '../server/contactSources.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const user = await requireStaff(req, res);
   if (!user) return;
 
   try {
+    const source = normalizeContactSource(req.query.source || req.body?.source);
+
     if (req.method === 'GET') {
-      const contacts = await fetchSheetContacts();
+      const contacts = await fetchContactsForSource(source);
       res.setHeader('Cache-Control', 'no-store');
-      return res.status(200).json({ contacts, syncedAt: new Date().toISOString() });
+      return res.status(200).json({ contacts, source, syncedAt: new Date().toISOString() });
+    }
+
+    if (source === 'flowlu') {
+      return res.status(405).json({ error: 'Flowlu CRM is a read-only campaign contact source. Manage Flowlu contacts inside Flowlu.' });
     }
 
     if (req.method === 'POST') {
@@ -53,7 +60,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     return res.status(405).json({ error: 'Method not allowed' });
   } catch (error: any) {
-    const message = error instanceof Error ? error.message : 'Unable to update Google Sheet.';
+    const message = error instanceof Error ? error.message : 'Unable to load or update contacts.';
     const permissionProblem =
       String(error?.code || '').includes('403') ||
       /permission|insufficient|forbidden/i.test(message);

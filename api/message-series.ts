@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import crypto from 'node:crypto';
 import { requireStaff } from '../server/auth.js';
-import { fetchSheetContacts } from '../server/googleSheets.js';
+import { encodeSourceCategory, fetchContactsForSource, normalizeContactSource } from '../server/contactSources.js';
 import { supabaseAdmin } from '../server/supabaseAdmin.js';
 
 type IncomingStep = {
@@ -181,7 +181,7 @@ async function createSchedule(
   sb: ReturnType<typeof supabaseAdmin>,
   ownerId: string | null,
 ) {
-  const { name, seriesId, contactIds, startAt, timezone } = req.body || {};
+  const { name, seriesId, contactIds, startAt, timezone, contactSource } = req.body || {};
 
   if (!String(name || '').trim() || !seriesId || !Array.isArray(contactIds) || !contactIds.length) {
     return res.status(400).json({ error: 'Campaign name, message series and contacts are required.' });
@@ -245,7 +245,8 @@ async function createSchedule(
     });
   }
 
-  const liveContacts = await fetchSheetContacts();
+  const source = normalizeContactSource(contactSource);
+  const liveContacts = await fetchContactsForSource(source);
   const requestedIds = new Set(contactIds.map(String));
   const selectedContacts = liveContacts.filter(
     (contact) => requestedIds.has(contact.id) && contact.status === 'Active',
@@ -281,7 +282,7 @@ async function createSchedule(
     schedule_id: scheduleId,
     phone: contact.phone,
     initial_name: contact.name,
-    initial_category: contact.category,
+    initial_category: encodeSourceCategory(source, contact.category),
   }));
 
   const { error: recipientsError } = await sb
