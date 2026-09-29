@@ -1,7 +1,7 @@
 import { Ban, CheckCircle2, Plus, RefreshCw, Search, UserRound } from 'lucide-react';
 import { useMemo, useState, type FormEvent } from 'react';
 import { addContact, setContactStatus } from '../lib/api';
-import type { Contact } from '../types';
+import type { Contact, ContactSource } from '../types';
 
 export function ContactsManager({
   contacts,
@@ -10,6 +10,8 @@ export function ContactsManager({
   error,
   onRefresh,
   onChanged,
+  source,
+  onSourceChange,
 }: {
   contacts: Contact[];
   syncedAt: string;
@@ -17,6 +19,8 @@ export function ContactsManager({
   error?: string;
   onRefresh: () => void | Promise<void>;
   onChanged: (contacts: Contact[], syncedAt: string) => void;
+  source: ContactSource;
+  onSourceChange: (source: ContactSource) => void;
 }) {
   const [query, setQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
@@ -39,9 +43,8 @@ export function ContactsManager({
 
   const filtered = useMemo(() => {
     const term = query.trim().toLowerCase();
-
     return contacts.filter((contact) => {
-      const matchesSearch = !term || `${contact.name} ${contact.phone} ${contact.category} ${contact.status}`
+      const matchesSearch = !term || (contact.name + ' ' + contact.phone + ' ' + contact.category + ' ' + contact.status)
         .toLowerCase()
         .includes(term);
       const matchesCategory = categoryFilter === 'all' || contact.category === categoryFilter;
@@ -52,8 +55,8 @@ export function ContactsManager({
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
+    if (source === 'flowlu') return;
     setLocalError('');
-
     if (!form.name.trim()) return setLocalError('Enter the contact name.');
     if (form.phone.replace(/\D/g, '').length < 10) return setLocalError('Enter a valid mobile number.');
 
@@ -75,11 +78,12 @@ export function ContactsManager({
   };
 
   const changeStatus = async (contact: Contact) => {
+    if (source === 'flowlu') return;
     const nextStatus = contact.status === 'Active' ? 'Inactive' : 'Active';
     const confirmed = window.confirm(
       nextStatus === 'Inactive'
-        ? `Deactivate ${contact.name}? The row will remain in Google Sheets and can be reactivated later.`
-        : `Reactivate ${contact.name}?`,
+        ? 'Deactivate ' + contact.name + '? The row will remain in the Excel / Google Sheet and can be reactivated later.'
+        : 'Reactivate ' + contact.name + '?',
     );
     if (!confirmed) return;
 
@@ -100,168 +104,90 @@ export function ContactsManager({
       <div className="contacts-page-head">
         <div>
           <h1>Contacts</h1>
-          <p>Live contacts from your Google Sheet. Contacts can be added or deactivated; permanent deletion is blocked.</p>
+          <p>
+            {source === 'flowlu'
+              ? 'Live contacts from Flowlu CRM. Flowlu remains the source of truth for editing contacts.'
+              : 'Live contacts from your Excel / Google Sheet. Contacts can be added or deactivated; permanent deletion is blocked.'}
+          </p>
         </div>
-        <button className="btn secondary" onClick={() => void onRefresh()} disabled={loading}>
-          <RefreshCw size={16} className={loading ? 'spin' : ''}/>
-          {loading ? 'Refreshing…' : 'Refresh'}
-        </button>
+        <div className="contacts-source-actions">
+          <div className="contacts-source-toggle">
+            <button type="button" className={source === 'sheet' ? 'active' : ''} onClick={() => onSourceChange('sheet')}>Excel Sheet</button>
+            <button type="button" className={source === 'flowlu' ? 'active' : ''} onClick={() => onSourceChange('flowlu')}>Flowlu CRM</button>
+          </div>
+          <button className="btn secondary" onClick={() => void onRefresh()} disabled={loading}>
+            <RefreshCw size={16} className={loading ? 'spin' : ''}/>
+            {loading ? 'Refreshing…' : 'Refresh'}
+          </button>
+        </div>
       </div>
 
       {(error || localError) && <div className="alert">{localError || error}</div>}
 
-      <section className="card contact-add-card">
-        <div className="section-title">
-          <span className="contact-title-icon"><Plus size={16}/></span>
-          Add Contact
-        </div>
+      {source === 'sheet' && (
+        <section className="card contact-add-card">
+          <div className="section-title"><span className="contact-title-icon"><Plus size={16}/></span>Add Contact</div>
+          <form className="contact-add-form" onSubmit={submit}>
+            <label><span>Name</span><input placeholder="Contact name" value={form.name} onChange={(event) => setForm((previous) => ({ ...previous, name: event.target.value }))}/></label>
+            <label><span>Mobile Number</span><input inputMode="tel" placeholder="e.g. 919876543210" value={form.phone} onChange={(event) => setForm((previous) => ({ ...previous, phone: event.target.value }))}/></label>
+            <label><span>Category</span><input placeholder="Contact" value={form.category} onChange={(event) => setForm((previous) => ({ ...previous, category: event.target.value }))}/></label>
+            <label>
+              <span>Status</span>
+              <select value={form.status} onChange={(event) => setForm((previous) => ({ ...previous, status: event.target.value as 'Active' | 'Inactive' }))}>
+                <option value="Active">Active</option><option value="Inactive">Inactive</option>
+              </select>
+            </label>
+            <button className="btn contact-add-button" disabled={adding}><Plus size={16}/>{adding ? 'Adding…' : 'Add Contact'}</button>
+          </form>
+        </section>
+      )}
 
-        <form className="contact-add-form" onSubmit={submit}>
-          <label>
-            <span>Name</span>
-            <input
-              placeholder="Contact name"
-              value={form.name}
-              onChange={(event) => setForm((previous) => ({ ...previous, name: event.target.value }))}
-            />
-          </label>
-
-          <label>
-            <span>Mobile Number</span>
-            <input
-              inputMode="tel"
-              placeholder="e.g. 919876543210"
-              value={form.phone}
-              onChange={(event) => setForm((previous) => ({ ...previous, phone: event.target.value }))}
-            />
-          </label>
-
-          <label>
-            <span>Category</span>
-            <input
-              placeholder="Contact"
-              value={form.category}
-              onChange={(event) => setForm((previous) => ({ ...previous, category: event.target.value }))}
-            />
-          </label>
-
-          <label>
-            <span>Status</span>
-            <select
-              value={form.status}
-              onChange={(event) => setForm((previous) => ({
-                ...previous,
-                status: event.target.value as 'Active' | 'Inactive',
-              }))}
-            >
-              <option value="Active">Active</option>
-              <option value="Inactive">Inactive</option>
-            </select>
-          </label>
-
-          <button className="btn contact-add-button" disabled={adding}>
-            <Plus size={16}/>
-            {adding ? 'Adding…' : 'Add Contact'}
-          </button>
-        </form>
-      </section>
+      {source === 'flowlu' && (
+        <section className="card flowlu-readonly-note">
+          <b>Flowlu CRM is connected as a live contact source</b>
+          <span>Add, edit or deactivate contacts inside Flowlu. Refresh here to pull the latest CRM data.</span>
+        </section>
+      )}
 
       <section className="card contacts-full-card">
         <div className="contacts-list-toolbar">
           <div>
-            <div className="section-title contacts-list-title">
-              <UserRound size={18}/> All Google Sheet Contacts
-            </div>
-            <small>
-              {contacts.length} contact{contacts.length === 1 ? '' : 's'}
-              {syncedAt ? ` · Last synced ${new Date(syncedAt).toLocaleString()}` : ''}
-            </small>
+            <div className="section-title contacts-list-title"><UserRound size={18}/> All {source === 'flowlu' ? 'Flowlu CRM' : 'Excel Sheet'} Contacts</div>
+            <small>{contacts.length} contact{contacts.length === 1 ? '' : 's'}{syncedAt ? ' · Last synced ' + new Date(syncedAt).toLocaleString() : ''}</small>
           </div>
-
           <div className="contacts-manager-filters">
-            <div className="search contacts-search">
-              <Search size={17}/>
-              <input
-                placeholder="Search name, mobile, category or status…"
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-              />
-            </div>
-
-            <select
-              className="filter-select"
-              value={categoryFilter}
-              onChange={(event) => setCategoryFilter(event.target.value)}
-            >
-              <option value="all">All categories</option>
-              {categories.map((category) => (
-                <option key={category} value={category}>{category}</option>
-              ))}
+            <div className="search contacts-search"><Search size={17}/><input placeholder="Search name, mobile, category or status…" value={query} onChange={(event) => setQuery(event.target.value)}/></div>
+            <select className="filter-select" value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)}>
+              <option value="all">All categories</option>{categories.map((category) => <option key={category} value={category}>{category}</option>)}
             </select>
-
-            <select
-              className="filter-select"
-              value={statusFilter}
-              onChange={(event) => setStatusFilter(event.target.value as 'all' | 'Active' | 'Inactive')}
-            >
-              <option value="all">All status</option>
-              <option value="Active">Active</option>
-              <option value="Inactive">Inactive</option>
+            <select className="filter-select" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as 'all' | 'Active' | 'Inactive')}>
+              <option value="all">All status</option><option value="Active">Active</option><option value="Inactive">Inactive</option>
             </select>
           </div>
         </div>
 
         <div className="table-wrap contacts-full-table">
           <table>
-            <thead>
-              <tr>
-                <th>#</th>
-                <th>Name</th>
-                <th>Mobile Number</th>
-                <th>Category</th>
-                <th>Status</th>
-                <th className="contact-actions-column">Action</th>
-              </tr>
-            </thead>
-
+            <thead><tr><th>#</th><th>Name</th><th>Mobile Number</th><th>Category</th><th>Status</th>{source === 'sheet' && <th className="contact-actions-column">Action</th>}</tr></thead>
             <tbody>
               {filtered.map((contact, index) => (
                 <tr key={contact.id}>
-                  <td>{index + 1}</td>
-                  <td><b>{contact.name}</b></td>
-                  <td>+{contact.phone}</td>
-                  <td>{contact.category}</td>
-                  <td>
-                    <span className={`pill ${contact.status === 'Active' ? 'ok' : 'muted'}`}>
-                      {contact.status}
-                    </span>
-                  </td>
-                  <td>
-                    <button
-                      className={`contact-status-button ${contact.status === 'Active' ? 'deactivate' : 'activate'}`}
-                      onClick={() => void changeStatus(contact)}
-                      disabled={changingStatusId === contact.id}
-                      title={contact.status === 'Active' ? 'Deactivate contact' : 'Reactivate contact'}
-                    >
-                      {contact.status === 'Active' ? <Ban size={15}/> : <CheckCircle2 size={15}/>}
-                      {changingStatusId === contact.id
-                        ? 'Updating…'
-                        : contact.status === 'Active'
-                          ? 'Deactivate'
-                          : 'Reactivate'}
-                    </button>
-                  </td>
+                  <td>{index + 1}</td><td><b>{contact.name}</b></td><td>+{contact.phone}</td><td>{contact.category}</td>
+                  <td><span className={'pill ' + (contact.status === 'Active' ? 'ok' : 'muted')}>{contact.status}</span></td>
+                  {source === 'sheet' && (
+                    <td>
+                      <button className={'contact-status-button ' + (contact.status === 'Active' ? 'deactivate' : 'activate')} onClick={() => void changeStatus(contact)} disabled={changingStatusId === contact.id} title={contact.status === 'Active' ? 'Deactivate contact' : 'Reactivate contact'}>
+                        {contact.status === 'Active' ? <Ban size={15}/> : <CheckCircle2 size={15}/>} 
+                        {changingStatusId === contact.id ? 'Updating…' : contact.status === 'Active' ? 'Deactivate' : 'Reactivate'}
+                      </button>
+                    </td>
+                  )}
                 </tr>
               ))}
-
               {!filtered.length && (
-                <tr>
-                  <td colSpan={6}>
-                    <div className="contacts-empty">
-                      {contacts.length ? 'No contacts match your search.' : 'No contacts found in the Google Sheet.'}
-                    </div>
-                  </td>
-                </tr>
+                <tr><td colSpan={source === 'sheet' ? 6 : 5}><div className="contacts-empty">
+                  {contacts.length ? 'No contacts match your search.' : source === 'flowlu' ? 'No Flowlu CRM contacts with a mobile number were found.' : 'No contacts found in the Excel / Google Sheet.'}
+                </div></td></tr>
               )}
             </tbody>
           </table>
