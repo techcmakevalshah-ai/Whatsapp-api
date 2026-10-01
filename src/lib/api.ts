@@ -343,3 +343,27 @@ export function createFlowluOpportunity(payload: {
     body: JSON.stringify(payload),
   });
 }
+
+
+export function createFlowluFollowupTask(payload: {
+  accountId: number;
+  name: string;
+  responsibleId: number;
+  deadline?: string;
+  description?: string;
+}): Promise<{ ok: true; taskId: number }> {
+  return json('/api/flowlu/tasks', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export function createFlowluContactNote(payload: {
+  accountId: number;
+  text: string;
+}): Promise<{ ok: true; noteId: number | null }> {
+  return json('/api/flowlu/notes', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}

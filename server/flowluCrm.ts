@@ -98,3 +98,71 @@ export async function createFlowluOpportunity(input: {
 
   return { id: leadId };
 }
+
+
+function escapeHtml(value: string) {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+export async function createFlowluFollowupTask(input: {
+  accountId: number;
+  name: string;
+  responsibleId: number;
+  deadline?: string;
+  description?: string;
+}) {
+  if (!Number.isFinite(input.accountId) || input.accountId <= 0) {
+    throw new Error('Flowlu contact id is required.');
+  }
+  if (!String(input.name || '').trim()) {
+    throw new Error('Task name is required.');
+  }
+  if (!Number.isFinite(input.responsibleId) || input.responsibleId <= 0) {
+    throw new Error('Choose a responsible Flowlu user.');
+  }
+
+  const deadline = String(input.deadline || '').trim();
+  const parsedDeadline = deadline ? new Date(deadline) : null;
+  if (parsedDeadline && Number.isNaN(parsedDeadline.getTime())) {
+    throw new Error('Enter a valid follow-up date and time.');
+  }
+
+  const data = await flowluPost('task/task/create', {
+    name: String(input.name).trim(),
+    responsible_id: input.responsibleId,
+    created_by: input.responsibleId,
+    crm_company_id: input.accountId,
+    deadline: parsedDeadline ? parsedDeadline.toISOString().replace('T', ' ').replace('Z', '') : undefined,
+    description: String(input.description || '').trim() || undefined,
+    archive_status: 0,
+    is_repeat: 0,
+  });
+
+  const taskId = Number(data?.response?.id || 0);
+  if (!taskId) throw new Error('Flowlu follow-up task could not be created.');
+  return { id: taskId };
+}
+
+export async function createFlowluContactNote(input: {
+  accountId: number;
+  text: string;
+}) {
+  if (!Number.isFinite(input.accountId) || input.accountId <= 0) {
+    throw new Error('Flowlu contact id is required.');
+  }
+
+  const text = String(input.text || '').trim();
+  if (!text) throw new Error('Enter a note.');
+
+  const safeText = escapeHtml(text).replace(/\n/g, '<br>');
+  const data = await flowluPost('crm/account/' + input.accountId + '/comments/create', {
+    text: '<p>' + safeText + '</p>',
+  });
+
+  return { id: Number(data?.response?.id || 0) || null };
+}

@@ -1360,3 +1360,16 @@ tbody tr:hover{background:#fafcff}
 .flowlu-create-opportunity{align-self:flex-end;background:#315cc9;color:#fff;border-color:#315cc9}
 .flowlu-success{border:1px solid #b9dfc6;background:#effaf3;color:#176a35;border-radius:8px;padding:9px 10px;font-size:10px;font-weight:700}
 @media(max-width:600px){.flowlu-contact-drawer{width:100%;padding:17px}.flowlu-contact-facts,.flowlu-opportunity-grid{grid-template-columns:1fr}.flowlu-create-opportunity{width:100%;justify-content:center}}
+
+.flowlu-contact-drawer{display:flex;flex-direction:column;gap:14px}
+.flowlu-contact-drawer .flowlu-drawer-head{margin-bottom:0}
+.flowlu-contact-drawer .flowlu-contact-facts{margin:2px 0}
+.flowlu-crm-action-box{border:1px solid #dce5f3;background:#f8fbff;border-radius:13px;padding:14px;display:flex;flex-direction:column;gap:10px}
+.flowlu-crm-action-box label{display:flex;flex-direction:column;gap:5px}
+.flowlu-crm-action-box label>span{font-size:9px;color:#53657c;font-weight:800}
+.flowlu-crm-action-box input,.flowlu-crm-action-box select,.flowlu-crm-action-box textarea{width:100%;border:1px solid #d9e1eb;border-radius:8px;background:#fff;padding:9px 10px;font:inherit;font-size:11px;color:#263950;outline:none}
+.flowlu-crm-action-box textarea{resize:vertical;min-height:78px;line-height:1.45}
+.flowlu-crm-action-box input:focus,.flowlu-crm-action-box select:focus,.flowlu-crm-action-box textarea:focus{border-color:#9db0de;box-shadow:0 0 0 3px rgba(49,92,201,.08)}
+.flowlu-secondary-action{align-self:flex-end;background:#fff;color:#315cc9;border-color:#bdcbea}
+.flowlu-secondary-action:hover:not(:disabled){background:#f1f5ff}
+@media(max-width:600px){.flowlu-secondary-action{width:100%;justify-content:center}}
