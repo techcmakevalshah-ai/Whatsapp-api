@@ -68,7 +68,7 @@ export function ContactsTable({ contacts, source, selected, onToggle, onToggleAl
           value={categoryFilter}
           onChange={(e) => setCategoryFilter(e.target.value)}
         >
-          <option value="all">All categories</option>
+          <option value="all">{source === 'flowlu' ? 'All segments' : 'All categories'}</option>
           {categories.map((category) => (
             <option key={category} value={category}>{category}</option>
           ))}
@@ -102,7 +102,7 @@ export function ContactsTable({ contacts, source, selected, onToggle, onToggleAl
               </th>
               <th>Name</th>
               <th>Mobile Number</th>
-              <th>Category</th>
+              <th>{source === 'flowlu' ? 'Segment' : 'Category'}</th>
               <th>Status</th>
             </tr>
           </thead>

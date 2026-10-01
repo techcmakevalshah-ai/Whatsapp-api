@@ -1,13 +1,20 @@
 export type FlowluContact = {
   id: string;
+  flowluId: number;
   name: string;
   phone: string;
   category: string;
+  categoryId?: number | null;
   status: 'Active' | 'Inactive';
   source: 'flowlu';
+  email?: string | null;
+  description?: string | null;
+  address?: string | null;
+  ownerId?: number | null;
+  sourceUpdatedAt?: string | null;
 };
 
-type FlowluCategory = {
+export type FlowluCategory = {
   id: number;
   name: string;
   active: boolean;
@@ -46,7 +53,7 @@ async function withFlowluRequestSlot<T>(operation: () => Promise<T>): Promise<T>
   }
 }
 
-function normalizePhone(value: unknown) {
+export function normalizeFlowluPhone(value: unknown) {
   const digits = String(value ?? '').replace(/\D/g, '');
   if (!digits) return '';
   const defaultCountryCode = (process.env.DEFAULT_COUNTRY_CODE || '91').replace(/\D/g, '');
@@ -117,7 +124,7 @@ async function flowluRequest(url: URL, init: RequestInit) {
   throw new Error('Flowlu request limit reached. Please wait a few seconds and refresh again.');
 }
 
-async function flowluGet(path: string, query: Record<string, string | number> = {}) {
+export async function flowluGet(path: string, query: Record<string, string | number> = {}) {
   const { apiKey, baseUrl } = flowluConfig();
   const url = new URL(baseUrl + '/' + String(path).replace(/^\/+/, ''));
   url.searchParams.set('api_key', apiKey);
@@ -125,7 +132,7 @@ async function flowluGet(path: string, query: Record<string, string | number> = 
   return flowluRequest(url, { method: 'GET', headers: { Accept: 'application/json' } });
 }
 
-async function flowluPost(path: string, body: Record<string, string | number | undefined>) {
+export async function flowluPost(path: string, body: Record<string, string | number | undefined>) {
   const { apiKey, baseUrl } = flowluConfig();
   const url = new URL(baseUrl + '/' + String(path).replace(/^\/+/, ''));
   url.searchParams.set('api_key', apiKey);
@@ -145,10 +152,8 @@ async function flowluPost(path: string, body: Record<string, string | number | u
   });
 }
 
-async function fetchFlowluCategories(force = false): Promise<FlowluCategory[]> {
-  if (!force && categoryCache && categoryCache.expiresAt > Date.now()) {
-    return categoryCache.value;
-  }
+export async function fetchFlowluCategories(force = false): Promise<FlowluCategory[]> {
+  if (!force && categoryCache && categoryCache.expiresAt > Date.now()) return categoryCache.value;
 
   const data = await flowluGet('crm/account_category/list', { page: 1, limit: 200 });
   const items = Array.isArray(data?.response?.items) ? data.response.items : [];
@@ -160,39 +165,78 @@ async function fetchFlowluCategories(force = false): Promise<FlowluCategory[]> {
     }))
     .filter((row: FlowluCategory) => row.id > 0 && Boolean(row.name));
 
-  categoryCache = {
-    expiresAt: Date.now() + FLOWLU_CATEGORY_CACHE_MS,
-    value: categories,
-  };
-
+  categoryCache = { expiresAt: Date.now() + FLOWLU_CATEGORY_CACHE_MS, value: categories };
   return categories;
 }
 
-function mapFlowluContact(row: any, categories: Map<number, string>): FlowluContact | null {
+function contactName(row: any) {
+  return String(row?.name || '').trim() || [row?.first_name, row?.middle_name, row?.last_name]
+    .map((part) => String(part || '').trim()).filter(Boolean).join(' ');
+}
+
+export function mapFlowluContact(row: any, categories: Map<number, string> = new Map()): FlowluContact | null {
   const type = Number(row?.type ?? row?.type_id ?? 0);
   if (type && type !== 2) return null;
 
-  const name = String(row?.name || '').trim() || [row?.first_name, row?.middle_name, row?.last_name]
-    .map((part) => String(part || '').trim()).filter(Boolean).join(' ');
-  const phone = normalizePhone(row?.phone) || normalizePhone(row?.phone2) || normalizePhone(row?.phone3);
-  if (!name || !phone || !row?.id) return null;
+  const flowluId = Number(row?.id || 0);
+  const name = contactName(row);
+  const phone = normalizeFlowluPhone(row?.phone) || normalizeFlowluPhone(row?.phone2) || normalizeFlowluPhone(row?.phone3);
+  if (!name || !phone || !flowluId) return null;
 
   const activeValue = typeof row?.active === 'string' ? row.active.toLowerCase() : row?.active;
   const active = ![0, '0', false, 'false', 'inactive'].includes(activeValue);
-  const categoryId = Number(row?.account_category_id || 0);
+  const categoryId = Number(row?.account_category_id || 0) || null;
   const category =
-    categories.get(categoryId) ||
+    (categoryId ? categories.get(categoryId) : '') ||
     String(row?.account_category_name || row?.category_name || row?.category || 'Flowlu CRM').trim() ||
     'Flowlu CRM';
 
   return {
-    id: 'flowlu:' + row.id,
+    id: 'flowlu:' + flowluId,
+    flowluId,
     name,
     phone,
     category,
+    categoryId,
     status: active ? 'Active' : 'Inactive',
     source: 'flowlu',
+    email: String(row?.email || row?.email_personal || '').trim() || null,
+    description: String(row?.description || '').trim() || null,
+    address: String(row?.address || '').trim() || null,
+    ownerId: Number(row?.owner_id || 0) || null,
+    sourceUpdatedAt: String(row?.updated_date || row?.created_date || '').trim() || null,
   };
+}
+
+export function invalidateFlowluMemoryCache() {
+  contactCache = null;
+}
+
+export async function fetchFlowluContactById(id: number): Promise<FlowluContact | null> {
+  if (!Number.isFinite(id) || id <= 0) return null;
+  const [data, categories] = await Promise.all([
+    flowluGet('crm/account/get/' + id),
+    fetchFlowluCategories(),
+  ]);
+  return mapFlowluContact(data?.response, new Map(categories.map((item) => [item.id, item.name])));
+}
+
+export async function findFlowluContactByPhone(value: unknown): Promise<FlowluContact | null> {
+  const phone = normalizeFlowluPhone(value);
+  if (!phone) return null;
+
+  const [data, categories] = await Promise.all([
+    flowluGet('crm/account/list', { search: phone, page: 1, limit: 50, 'filter[type_id]': 2 }),
+    fetchFlowluCategories(),
+  ]);
+  const categoryMap = new Map(categories.map((item) => [item.id, item.name]));
+  const items = Array.isArray(data?.response?.items) ? data.response.items : [];
+
+  for (const row of items) {
+    const contact = mapFlowluContact(row, categoryMap);
+    if (contact && contact.phone === phone) return contact;
+  }
+  return null;
 }
 
 export async function createFlowluContact(input: {
@@ -202,10 +246,15 @@ export async function createFlowluContact(input: {
   status?: 'Active' | 'Inactive';
 }): Promise<FlowluContact> {
   const { firstName, lastName } = splitName(input.name);
-  const phone = normalizePhone(input.phone);
+  const phone = normalizeFlowluPhone(input.phone);
 
   if (!firstName) throw new Error('Contact name is required.');
   if (phone.length < 10) throw new Error('Enter a valid mobile number.');
+
+  const duplicate = await findFlowluContactByPhone(phone);
+  if (duplicate) {
+    throw new Error('A Flowlu contact already exists with this mobile number: ' + duplicate.name + ' (+' + duplicate.phone + ').');
+  }
 
   const categoryName = String(input.category || '').trim();
   let categoryId: number | undefined;
@@ -244,13 +293,17 @@ export async function createFlowluContact(input: {
   const id = Number(data?.response?.id || 0);
   if (!id) throw new Error('Flowlu contact could not be created.');
 
-  contactCache = null;
+  invalidateFlowluMemoryCache();
+  const created = await fetchFlowluContactById(id);
+  if (created) return created;
 
   return {
     id: 'flowlu:' + id,
+    flowluId: id,
     name: [firstName, lastName].filter(Boolean).join(' '),
     phone,
     category: categoryName || 'Flowlu CRM',
+    categoryId: categoryId || null,
     status: input.status === 'Inactive' ? 'Inactive' : 'Active',
     source: 'flowlu',
   };
@@ -281,19 +334,13 @@ async function loadFlowluContacts(): Promise<FlowluContact[]> {
     if (!items.length || items.length < pageSize || (total > 0 && page * pageSize >= total)) break;
   }
 
-  contactCache = {
-    expiresAt: Date.now() + FLOWLU_CONTACT_CACHE_MS,
-    value: contacts,
-  };
-
+  contactCache = { expiresAt: Date.now() + FLOWLU_CONTACT_CACHE_MS, value: contacts };
   return contacts;
 }
 
-export async function fetchFlowluContacts(): Promise<FlowluContact[]> {
-  if (contactCache && contactCache.expiresAt > Date.now()) {
-    return contactCache.value;
-  }
-
+export async function fetchFlowluContacts(force = false): Promise<FlowluContact[]> {
+  if (force) contactCache = null;
+  if (contactCache && contactCache.expiresAt > Date.now()) return contactCache.value;
   if (contactsInFlight) return contactsInFlight;
 
   contactsInFlight = loadFlowluContacts();

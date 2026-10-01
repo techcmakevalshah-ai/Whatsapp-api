@@ -2,7 +2,8 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { requireStaff } from '../server/auth.js';
 import { addSheetContact, fetchSheetContacts, setSheetContactStatus } from '../server/googleSheets.js';
 import { fetchContactsForSource, normalizeContactSource } from '../server/contactSources.js';
-import { createFlowluContact, fetchFlowluContacts } from '../server/flowluContacts.js';
+import { createFlowluContact } from '../server/flowluContacts.js';
+import { getFlowluContactsSmart, upsertFlowluContactCache } from '../server/flowluCache.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const user = await requireStaff(req, res);
@@ -12,6 +13,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   try {
     if (req.method === 'GET') {
+      if (source === 'flowlu') {
+        const force = String(req.query.force || '') === '1';
+        const result = await getFlowluContactsSmart(force);
+        res.setHeader('Cache-Control', 'no-store');
+        return res.status(200).json({
+          contacts: result.contacts,
+          source,
+          syncedAt: result.syncedAt,
+          syncMode: result.syncMode,
+          cacheEnabled: result.cacheEnabled,
+        });
+      }
+
       const contacts = await fetchContactsForSource(source);
       res.setHeader('Cache-Control', 'no-store');
       return res.status(200).json({ contacts, source, syncedAt: new Date().toISOString() });
@@ -27,13 +41,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           category: String(category || ''),
           status: status === 'Inactive' ? 'Inactive' : 'Active',
         });
-        const contacts = await fetchFlowluContacts();
+        await upsertFlowluContactCache(contact);
+        const result = await getFlowluContactsSmart(false);
 
         return res.status(201).json({
           contact,
-          contacts,
+          contacts: result.contacts,
           source,
-          syncedAt: new Date().toISOString(),
+          syncedAt: result.syncedAt,
         });
       }
 
@@ -87,7 +102,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       String(error?.code || '').includes('403') ||
       /permission|insufficient|forbidden/i.test(message);
 
-    return res.status(permissionProblem ? 403 : 500).json({
+    const duplicateProblem = /already exists with this mobile number/i.test(message);
+    return res.status(duplicateProblem ? 409 : permissionProblem ? 403 : 500).json({
       error: permissionProblem
         ? source === 'flowlu'
           ? 'Flowlu API access was denied. Check the Flowlu API key and CRM permissions.'

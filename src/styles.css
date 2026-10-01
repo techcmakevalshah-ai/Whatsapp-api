@@ -1332,3 +1332,31 @@ tbody tr:hover{background:#fafcff}
   .contacts-source-toggle{width:100%}
   .contacts-source-actions>.btn{width:100%;justify-content:center}
 }
+
+/* Flowlu CRM contact details + opportunities */
+.flowlu-contact-link{border:0;background:transparent;padding:0;color:#2658b8;font:inherit;font-weight:800;cursor:pointer;text-align:left}
+.flowlu-contact-link:hover{text-decoration:underline;text-underline-offset:2px}
+.flowlu-view-contact{color:#315cc9!important;border-color:#cfd9ef!important;background:#f7f9ff!important}
+.flowlu-drawer-backdrop{position:fixed;inset:0;z-index:1500;background:rgba(10,18,31,.42);display:flex;justify-content:flex-end;backdrop-filter:blur(2px)}
+.flowlu-contact-drawer{width:min(520px,96vw);height:100%;overflow:auto;background:#fff;border-left:1px solid #dde4ed;box-shadow:-24px 0 70px rgba(15,23,42,.18);padding:22px}
+.flowlu-drawer-head{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;padding-bottom:16px;border-bottom:1px solid #edf1f5}
+.flowlu-drawer-head span{font-size:9px;text-transform:uppercase;letter-spacing:.06em;color:#8090a5;font-weight:800}
+.flowlu-drawer-head h2{margin:4px 0 0;font-size:22px;color:#15263e;letter-spacing:-.03em}
+.flowlu-drawer-head button{width:34px;height:34px;border-radius:9px;border:1px solid #e0e6ee;background:#fff;color:#5f6f85;display:grid;place-items:center;cursor:pointer}
+.flowlu-contact-facts{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:16px 0}
+.flowlu-contact-facts>div{display:flex;gap:9px;align-items:flex-start;border:1px solid #e8edf3;border-radius:10px;padding:11px;background:#fbfcfe}
+.flowlu-contact-facts svg{color:#55708f;flex:0 0 auto;margin-top:2px}
+.flowlu-contact-facts span{display:flex;flex-direction:column;gap:2px;min-width:0}
+.flowlu-contact-facts small,.flowlu-contact-description small{font-size:8px;text-transform:uppercase;letter-spacing:.05em;color:#8a96a8;font-weight:800}
+.flowlu-contact-facts b{font-size:11px;color:#263950;overflow-wrap:anywhere}
+.flowlu-contact-description{border:1px solid #e8edf3;border-radius:10px;padding:11px;margin-bottom:16px}
+.flowlu-contact-description p{margin:5px 0 0;font-size:11px;color:#52647a;line-height:1.5;white-space:pre-wrap}
+.flowlu-opportunity-box{border:1px solid #dce5f3;background:#f8fbff;border-radius:13px;padding:14px;display:flex;flex-direction:column;gap:10px}
+.flowlu-opportunity-title{display:flex;align-items:center;gap:7px;color:#254d86}
+.flowlu-opportunity-box label{display:flex;flex-direction:column;gap:5px}
+.flowlu-opportunity-box label>span{font-size:9px;color:#53657c;font-weight:800}
+.flowlu-opportunity-box input,.flowlu-opportunity-box select{width:100%;border:1px solid #d9e1eb;border-radius:8px;background:#fff;padding:9px 10px;font:inherit;font-size:11px;color:#263950;outline:none}
+.flowlu-opportunity-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+.flowlu-create-opportunity{align-self:flex-end;background:#315cc9;color:#fff;border-color:#315cc9}
+.flowlu-success{border:1px solid #b9dfc6;background:#effaf3;color:#176a35;border-radius:8px;padding:9px 10px;font-size:10px;font-weight:700}
+@media(max-width:600px){.flowlu-contact-drawer{width:100%;padding:17px}.flowlu-contact-facts,.flowlu-opportunity-grid{grid-template-columns:1fr}.flowlu-create-opportunity{width:100%;justify-content:center}}

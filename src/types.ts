@@ -7,6 +7,27 @@ export type Contact = {
   category: string;
   status: 'Active' | 'Inactive';
   source?: ContactSource;
+  flowluId?: number;
+  categoryId?: number | null;
+  email?: string | null;
+  description?: string | null;
+  address?: string | null;
+  ownerId?: number | null;
+  sourceUpdatedAt?: string | null;
+};
+
+export type FlowluOption = {
+  id: number;
+  name: string;
+  active: boolean;
+  pipelineId?: number | null;
+};
+
+export type FlowluSalesMeta = {
+  pipelines: FlowluOption[];
+  stages: FlowluOption[];
+  sources: FlowluOption[];
+  users: FlowluOption[];
 };
 
 export type WhatsAppTemplate = {

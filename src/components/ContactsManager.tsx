@@ -1,7 +1,8 @@
-import { Ban, CheckCircle2, Plus, RefreshCw, Search, UserRound } from 'lucide-react';
+import { Ban, CheckCircle2, Eye, Plus, RefreshCw, Search, UserRound } from 'lucide-react';
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { addContact, setContactStatus } from '../lib/api';
 import type { Contact, ContactSource } from '../types';
+import { FlowluContactDrawer } from './FlowluContactDrawer';
 
 export function ContactsManager({
   contacts,
@@ -28,6 +29,7 @@ export function ContactsManager({
   const [adding, setAdding] = useState(false);
   const [changingStatusId, setChangingStatusId] = useState('');
   const [localError, setLocalError] = useState('');
+  const [detailContact, setDetailContact] = useState<Contact | null>(null);
   const [form, setForm] = useState({
     name: '',
     phone: '',
@@ -205,7 +207,7 @@ export function ContactsManager({
           <div className="contacts-manager-filters">
             <div className="search contacts-search"><Search size={17}/><input placeholder="Search name, mobile, category or status…" value={query} onChange={(event) => setQuery(event.target.value)}/></div>
             <select className="filter-select" value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)}>
-              <option value="all">All categories</option>{categories.map((category) => <option key={category} value={category}>{category}</option>)}
+              <option value="all">{source === 'flowlu' ? 'All segments' : 'All categories'}</option>{categories.map((category) => <option key={category} value={category}>{category}</option>)}
             </select>
             <select className="filter-select" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as 'all' | 'Active' | 'Inactive')}>
               <option value="all">All status</option><option value="Active">Active</option><option value="Inactive">Inactive</option>
@@ -215,24 +217,34 @@ export function ContactsManager({
 
         <div className="table-wrap contacts-full-table">
           <table>
-            <thead><tr><th>#</th><th>Name</th><th>Mobile Number</th><th>Category</th><th>Status</th>{source === 'sheet' && <th className="contact-actions-column">Action</th>}</tr></thead>
+            <thead><tr><th>#</th><th>Name</th><th>Mobile Number</th><th>{source === 'flowlu' ? 'Segment' : 'Category'}</th><th>Status</th><th className="contact-actions-column">Action</th></tr></thead>
             <tbody>
               {filtered.map((contact, index) => (
                 <tr key={contact.id}>
-                  <td>{index + 1}</td><td><b>{contact.name}</b></td><td>+{contact.phone}</td><td>{contact.category}</td>
+                  <td>{index + 1}</td>
+                  <td>
+                    {source === 'flowlu'
+                      ? <button type="button" className="flowlu-contact-link" onClick={() => setDetailContact(contact)}>{contact.name}</button>
+                      : <b>{contact.name}</b>}
+                  </td>
+                  <td>+{contact.phone}</td><td>{contact.category}</td>
                   <td><span className={'pill ' + (contact.status === 'Active' ? 'ok' : 'muted')}>{contact.status}</span></td>
-                  {source === 'sheet' && (
-                    <td>
+                  <td>
+                    {source === 'sheet' ? (
                       <button className={'contact-status-button ' + (contact.status === 'Active' ? 'deactivate' : 'activate')} onClick={() => void changeStatus(contact)} disabled={changingStatusId === contact.id} title={contact.status === 'Active' ? 'Deactivate contact' : 'Reactivate contact'}>
                         {contact.status === 'Active' ? <Ban size={15}/> : <CheckCircle2 size={15}/>} 
                         {changingStatusId === contact.id ? 'Updating…' : contact.status === 'Active' ? 'Deactivate' : 'Reactivate'}
                       </button>
-                    </td>
-                  )}
+                    ) : (
+                      <button className="contact-status-button flowlu-view-contact" type="button" onClick={() => setDetailContact(contact)}>
+                        <Eye size={15}/> Details
+                      </button>
+                    )}
+                  </td>
                 </tr>
               ))}
               {!filtered.length && (
-                <tr><td colSpan={source === 'sheet' ? 6 : 5}><div className="contacts-empty">
+                <tr><td colSpan={6}><div className="contacts-empty">
                   {contacts.length ? 'No contacts match your search.' : source === 'flowlu' ? 'No Flowlu CRM contacts with a mobile number were found.' : 'No contacts found in the Excel / Google Sheet.'}
                 </div></td></tr>
               )}
@@ -240,6 +252,7 @@ export function ContactsManager({
           </table>
         </div>
       </section>
+      <FlowluContactDrawer contact={source === 'flowlu' ? detailContact : null} onClose={() => setDetailContact(null)}/>
     </div>
   );
 }

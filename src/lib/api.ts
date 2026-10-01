@@ -1,5 +1,5 @@
 import { supabase } from './supabase';
-import type { CampaignSummary, Contact, ContactSource, DashboardStats, ManagedWhatsAppTemplate, MessageSeries, MessageSeriesScheduleSummary, MessageSeriesStep, RecipientStatus, RecurringCampaignSummary, StaffProfile, StaffUserProfile, TemplateFolder, WhatsAppTemplate } from '../types';
+import type { CampaignSummary, Contact, ContactSource, DashboardStats, FlowluSalesMeta, ManagedWhatsAppTemplate, MessageSeries, MessageSeriesScheduleSummary, MessageSeriesStep, RecipientStatus, RecurringCampaignSummary, StaffProfile, StaffUserProfile, TemplateFolder, WhatsAppTemplate } from '../types';
 
 async function json<T>(url: string, init?: RequestInit): Promise<T> {
   const headers = new Headers(init?.headers);
@@ -20,8 +20,15 @@ async function json<T>(url: string, init?: RequestInit): Promise<T> {
   return body as T;
 }
 
-export function getContacts(source: ContactSource = 'sheet'): Promise<{ contacts: Contact[]; source: ContactSource; syncedAt: string }> {
-  return json('/api/contacts?source=' + encodeURIComponent(source));
+export function getContacts(source: ContactSource = 'sheet', force = false): Promise<{
+  contacts: Contact[];
+  source: ContactSource;
+  syncedAt: string;
+  syncMode?: 'cache' | 'live';
+  cacheEnabled?: boolean;
+}> {
+  const forceQuery = force ? '&force=1' : '';
+  return json('/api/contacts?source=' + encodeURIComponent(source) + forceQuery);
 }
 
 export function getTemplates(): Promise<{ templates: WhatsAppTemplate[] }> {
@@ -314,5 +321,25 @@ export function completePasswordSetup(): Promise<{ ok: true }> {
   return json('/api/users?view=me', {
     method: 'PATCH',
     body: JSON.stringify({ action: 'password_setup_complete' }),
+  });
+}
+
+
+export function getFlowluSalesMeta(): Promise<FlowluSalesMeta> {
+  return json('/api/flowlu/meta');
+}
+
+export function createFlowluOpportunity(payload: {
+  accountId: number;
+  name: string;
+  budget?: number;
+  pipelineId: number;
+  stageId?: number;
+  sourceId?: number;
+  assigneeId?: number;
+}): Promise<{ ok: true; opportunityId: number }> {
+  return json('/api/flowlu/opportunities', {
+    method: 'POST',
+    body: JSON.stringify(payload),
   });
 }
