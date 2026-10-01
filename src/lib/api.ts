@@ -326,7 +326,7 @@ export function completePasswordSetup(): Promise<{ ok: true }> {
 
 
 export function getFlowluSalesMeta(): Promise<FlowluSalesMeta> {
-  return json('/api/flowlu/meta');
+  return json('/api/contacts?action=flowlu-meta');
 }
 
 export function createFlowluOpportunity(payload: {
@@ -338,7 +338,7 @@ export function createFlowluOpportunity(payload: {
   sourceId?: number;
   assigneeId?: number;
 }): Promise<{ ok: true; opportunityId: number }> {
-  return json('/api/flowlu/opportunities', {
+  return json('/api/contacts?action=flowlu-opportunity', {
     method: 'POST',
     body: JSON.stringify(payload),
   });
@@ -352,7 +352,7 @@ export function createFlowluFollowupTask(payload: {
   deadline?: string;
   description?: string;
 }): Promise<{ ok: true; taskId: number }> {
-  return json('/api/flowlu/tasks', {
+  return json('/api/contacts?action=flowlu-task', {
     method: 'POST',
     body: JSON.stringify(payload),
   });
@@ -362,7 +362,7 @@ export function createFlowluContactNote(payload: {
   accountId: number;
   text: string;
 }): Promise<{ ok: true; noteId: number | null }> {
-  return json('/api/flowlu/notes', {
+  return json('/api/contacts?action=flowlu-note', {
     method: 'POST',
     body: JSON.stringify(payload),
   });
