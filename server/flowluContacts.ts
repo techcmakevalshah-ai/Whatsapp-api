@@ -13,6 +13,39 @@ type FlowluCategory = {
   active: boolean;
 };
 
+const FLOWLU_REQUEST_GAP_MS = 650;
+const FLOWLU_MAX_ATTEMPTS = 4;
+const FLOWLU_CATEGORY_CACHE_MS = 10 * 60 * 1000;
+const FLOWLU_CONTACT_CACHE_MS = 20 * 1000;
+
+let flowluRequestTail: Promise<void> = Promise.resolve();
+let lastFlowluRequestAt = 0;
+let categoryCache: { expiresAt: number; value: FlowluCategory[] } | null = null;
+let contactCache: { expiresAt: number; value: FlowluContact[] } | null = null;
+let contactsInFlight: Promise<FlowluContact[]> | null = null;
+
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function withFlowluRequestSlot<T>(operation: () => Promise<T>): Promise<T> {
+  const previous = flowluRequestTail;
+  let release: () => void = () => {};
+  flowluRequestTail = new Promise<void>((resolve) => { release = resolve; });
+
+  await previous.catch(() => undefined);
+
+  const waitMs = Math.max(0, lastFlowluRequestAt + FLOWLU_REQUEST_GAP_MS - Date.now());
+  if (waitMs > 0) await sleep(waitMs);
+
+  try {
+    return await operation();
+  } finally {
+    lastFlowluRequestAt = Date.now();
+    release();
+  }
+}
+
 function normalizePhone(value: unknown) {
   const digits = String(value ?? '').replace(/\D/g, '');
   if (!digits) return '';
@@ -45,16 +78,43 @@ function flowluError(data: any, status: number) {
   );
 }
 
-async function parseFlowluResponse(response: Response) {
-  const raw = await response.text();
-  let data: any = {};
-  try {
-    data = raw ? JSON.parse(raw) : {};
-  } catch {
-    throw new Error('Flowlu returned an invalid response (' + response.status + ').');
+async function flowluRequest(url: URL, init: RequestInit) {
+  for (let attempt = 1; attempt <= FLOWLU_MAX_ATTEMPTS; attempt += 1) {
+    const response = await withFlowluRequestSlot(() => fetch(url, init));
+    const raw = await response.text();
+
+    let data: any = {};
+    try {
+      data = raw ? JSON.parse(raw) : {};
+    } catch {
+      throw new Error('Flowlu returned an invalid response (' + response.status + ').');
+    }
+
+    const message = flowluError(data, response.status);
+    const rateLimited =
+      response.status === 429 ||
+      /request limit|rate limit|too many requests|throttl/i.test(message);
+
+    if (rateLimited && attempt < FLOWLU_MAX_ATTEMPTS) {
+      const retryAfterHeader = Number(response.headers.get('retry-after') || 0);
+      const retryAfterMs = retryAfterHeader > 0
+        ? retryAfterHeader * 1000
+        : Math.min(8000, 1000 * Math.pow(2, attempt - 1));
+      await sleep(retryAfterMs);
+      continue;
+    }
+
+    if (!response.ok || data?.error) {
+      if (rateLimited) {
+        throw new Error('Flowlu request limit reached. Please wait a few seconds and refresh again.');
+      }
+      throw new Error(message);
+    }
+
+    return data;
   }
-  if (!response.ok || data?.error) throw new Error(flowluError(data, response.status));
-  return data;
+
+  throw new Error('Flowlu request limit reached. Please wait a few seconds and refresh again.');
 }
 
 async function flowluGet(path: string, query: Record<string, string | number> = {}) {
@@ -62,7 +122,7 @@ async function flowluGet(path: string, query: Record<string, string | number> = 
   const url = new URL(baseUrl + '/' + String(path).replace(/^\/+/, ''));
   url.searchParams.set('api_key', apiKey);
   for (const [key, value] of Object.entries(query)) url.searchParams.set(key, String(value));
-  return parseFlowluResponse(await fetch(url, { method: 'GET', headers: { Accept: 'application/json' } }));
+  return flowluRequest(url, { method: 'GET', headers: { Accept: 'application/json' } });
 }
 
 async function flowluPost(path: string, body: Record<string, string | number | undefined>) {
@@ -75,26 +135,37 @@ async function flowluPost(path: string, body: Record<string, string | number | u
     if (value !== undefined && value !== '') form.set(key, String(value));
   }
 
-  return parseFlowluResponse(await fetch(url, {
+  return flowluRequest(url, {
     method: 'POST',
     headers: {
       Accept: 'application/json',
       'Content-Type': 'application/x-www-form-urlencoded',
     },
     body: form.toString(),
-  }));
+  });
 }
 
-async function fetchFlowluCategories(): Promise<FlowluCategory[]> {
-  const data = await flowluGet('crm/account_category/list', { page: 1, limit: 500 });
+async function fetchFlowluCategories(force = false): Promise<FlowluCategory[]> {
+  if (!force && categoryCache && categoryCache.expiresAt > Date.now()) {
+    return categoryCache.value;
+  }
+
+  const data = await flowluGet('crm/account_category/list', { page: 1, limit: 200 });
   const items = Array.isArray(data?.response?.items) ? data.response.items : [];
-  return items
+  const categories = items
     .map((row: any) => ({
       id: Number(row?.id || 0),
       name: String(row?.name || '').trim(),
       active: ![0, '0', false, 'false'].includes(row?.active),
     }))
     .filter((row: FlowluCategory) => row.id > 0 && Boolean(row.name));
+
+  categoryCache = {
+    expiresAt: Date.now() + FLOWLU_CATEGORY_CACHE_MS,
+    value: categories,
+  };
+
+  return categories;
 }
 
 function mapFlowluContact(row: any, categories: Map<number, string>): FlowluContact | null {
@@ -140,10 +211,18 @@ export async function createFlowluContact(input: {
   let categoryId: number | undefined;
 
   if (categoryName) {
-    const categories = await fetchFlowluCategories();
-    const category = categories.find(
+    let categories = await fetchFlowluCategories();
+    let category = categories.find(
       (item) => item.active && item.name.toLowerCase() === categoryName.toLowerCase(),
     );
+
+    if (!category) {
+      categories = await fetchFlowluCategories(true);
+      category = categories.find(
+        (item) => item.active && item.name.toLowerCase() === categoryName.toLowerCase(),
+      );
+    }
+
     if (!category) {
       throw new Error(
         'Flowlu category "' + categoryName + '" was not found. Create that segment in Flowlu first or leave Category blank.',
@@ -165,6 +244,8 @@ export async function createFlowluContact(input: {
   const id = Number(data?.response?.id || 0);
   if (!id) throw new Error('Flowlu contact could not be created.');
 
+  contactCache = null;
+
   return {
     id: 'flowlu:' + id,
     name: [firstName, lastName].filter(Boolean).join(' '),
@@ -175,7 +256,7 @@ export async function createFlowluContact(input: {
   };
 }
 
-export async function fetchFlowluContacts(): Promise<FlowluContact[]> {
+async function loadFlowluContacts(): Promise<FlowluContact[]> {
   const contacts: FlowluContact[] = [];
   const pageSize = 200;
   const categories = new Map(
@@ -183,16 +264,42 @@ export async function fetchFlowluContacts(): Promise<FlowluContact[]> {
   );
 
   for (let page = 1; page <= 50; page += 1) {
-    const data = await flowluGet('crm/account/list', { page, limit: pageSize, count: pageSize });
+    const data = await flowluGet('crm/account/list', {
+      page,
+      limit: pageSize,
+      'filter[type_id]': 2,
+    });
     const items = Array.isArray(data?.response?.items) ? data.response.items : [];
+
     contacts.push(
       ...items
         .map((row: any) => mapFlowluContact(row, categories))
         .filter((item: FlowluContact | null): item is FlowluContact => Boolean(item)),
     );
+
     const total = Number(data?.response?.total || 0);
     if (!items.length || items.length < pageSize || (total > 0 && page * pageSize >= total)) break;
   }
 
+  contactCache = {
+    expiresAt: Date.now() + FLOWLU_CONTACT_CACHE_MS,
+    value: contacts,
+  };
+
   return contacts;
+}
+
+export async function fetchFlowluContacts(): Promise<FlowluContact[]> {
+  if (contactCache && contactCache.expiresAt > Date.now()) {
+    return contactCache.value;
+  }
+
+  if (contactsInFlight) return contactsInFlight;
+
+  contactsInFlight = loadFlowluContacts();
+  try {
+    return await contactsInFlight;
+  } finally {
+    contactsInFlight = null;
+  }
 }

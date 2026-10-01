@@ -120,8 +120,8 @@ export function ContactsManager({
         </div>
         <div className="contacts-source-actions">
           <div className="contacts-source-toggle">
-            <button type="button" className={source === 'sheet' ? 'active' : ''} onClick={() => onSourceChange('sheet')}>Excel Sheet</button>
-            <button type="button" className={source === 'flowlu' ? 'active' : ''} onClick={() => onSourceChange('flowlu')}>Flowlu CRM</button>
+            <button type="button" className={source === 'sheet' ? 'active' : ''} onClick={() => onSourceChange('sheet')} disabled={loading}>Excel Sheet</button>
+            <button type="button" className={source === 'flowlu' ? 'active' : ''} onClick={() => onSourceChange('flowlu')} disabled={loading}>Flowlu CRM</button>
           </div>
           <button className="btn secondary" onClick={() => void onRefresh()} disabled={loading}>
             <RefreshCw size={16} className={loading ? 'spin' : ''}/>

@@ -158,6 +158,7 @@ export default function App() {
   };
 
   const changeContactSource = (source: ContactSource) => {
+    if (loadingContacts) return;
     if (source === contactSource) {
       void refreshContacts(source);
       return;
