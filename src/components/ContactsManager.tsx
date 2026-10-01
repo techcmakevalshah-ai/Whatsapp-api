@@ -1,5 +1,5 @@
 import { Ban, CheckCircle2, Plus, RefreshCw, Search, UserRound } from 'lucide-react';
-import { useMemo, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { addContact, setContactStatus } from '../lib/api';
 import type { Contact, ContactSource } from '../types';
 
@@ -31,7 +31,7 @@ export function ContactsManager({
   const [form, setForm] = useState({
     name: '',
     phone: '',
-    category: 'Contact',
+    category: '',
     status: 'Active' as 'Active' | 'Inactive',
   });
 
@@ -40,6 +40,14 @@ export function ContactsManager({
       .sort((a, b) => a.localeCompare(b)),
     [contacts],
   );
+
+  useEffect(() => {
+    setQuery('');
+    setCategoryFilter('all');
+    setStatusFilter('all');
+    setLocalError('');
+    setForm({ name: '', phone: '', category: '', status: 'Active' });
+  }, [source]);
 
   const filtered = useMemo(() => {
     const term = query.trim().toLowerCase();
@@ -55,7 +63,6 @@ export function ContactsManager({
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
-    if (source === 'flowlu') return;
     setLocalError('');
     if (!form.name.trim()) return setLocalError('Enter the contact name.');
     if (form.phone.replace(/\D/g, '').length < 10) return setLocalError('Enter a valid mobile number.');
@@ -65,11 +72,12 @@ export function ContactsManager({
       const result = await addContact({
         name: form.name.trim(),
         phone: form.phone.trim(),
-        category: form.category.trim() || 'Contact',
+        category: form.category.trim() || (source === 'sheet' ? 'Contact' : ''),
         status: form.status,
+        source,
       });
       onChanged(result.contacts, result.syncedAt);
-      setForm({ name: '', phone: '', category: 'Contact', status: 'Active' });
+      setForm({ name: '', phone: '', category: '', status: 'Active' });
     } catch (err) {
       setLocalError(err instanceof Error ? err.message : 'Unable to add contact.');
     } finally {
@@ -106,7 +114,7 @@ export function ContactsManager({
           <h1>Contacts</h1>
           <p>
             {source === 'flowlu'
-              ? 'Live contacts from Flowlu CRM. Flowlu remains the source of truth for editing contacts.'
+              ? 'Live contacts from Flowlu CRM. Add new Flowlu contacts here; edit or deactivate existing contacts in Flowlu.'
               : 'Live contacts from your Excel / Google Sheet. Contacts can be added or deactivated; permanent deletion is blocked.'}
           </p>
         </div>
@@ -124,30 +132,69 @@ export function ContactsManager({
 
       {(error || localError) && <div className="alert">{localError || error}</div>}
 
-      {source === 'sheet' && (
-        <section className="card contact-add-card">
-          <div className="section-title"><span className="contact-title-icon"><Plus size={16}/></span>Add Contact</div>
-          <form className="contact-add-form" onSubmit={submit}>
-            <label><span>Name</span><input placeholder="Contact name" value={form.name} onChange={(event) => setForm((previous) => ({ ...previous, name: event.target.value }))}/></label>
-            <label><span>Mobile Number</span><input inputMode="tel" placeholder="e.g. 919876543210" value={form.phone} onChange={(event) => setForm((previous) => ({ ...previous, phone: event.target.value }))}/></label>
-            <label><span>Category</span><input placeholder="Contact" value={form.category} onChange={(event) => setForm((previous) => ({ ...previous, category: event.target.value }))}/></label>
-            <label>
-              <span>Status</span>
-              <select value={form.status} onChange={(event) => setForm((previous) => ({ ...previous, status: event.target.value as 'Active' | 'Inactive' }))}>
-                <option value="Active">Active</option><option value="Inactive">Inactive</option>
-              </select>
-            </label>
-            <button className="btn contact-add-button" disabled={adding}><Plus size={16}/>{adding ? 'Adding…' : 'Add Contact'}</button>
-          </form>
-        </section>
-      )}
-
-      {source === 'flowlu' && (
-        <section className="card flowlu-readonly-note">
-          <b>Flowlu CRM is connected as a live contact source</b>
-          <span>Add, edit or deactivate contacts inside Flowlu. Refresh here to pull the latest CRM data.</span>
-        </section>
-      )}
+      <section className="card contact-add-card">
+        <div className="section-title">
+          <span className="contact-title-icon"><Plus size={16}/></span>
+          {source === 'flowlu' ? 'Add Flowlu Contact' : 'Add Contact'}
+        </div>
+        <form className="contact-add-form" onSubmit={submit}>
+          <label>
+            <span>Name</span>
+            <input
+              placeholder="Contact name"
+              value={form.name}
+              onChange={(event) => setForm((previous) => ({ ...previous, name: event.target.value }))}
+            />
+          </label>
+          <label>
+            <span>Mobile Number</span>
+            <input
+              inputMode="tel"
+              placeholder="e.g. 919876543210"
+              value={form.phone}
+              onChange={(event) => setForm((previous) => ({ ...previous, phone: event.target.value }))}
+            />
+          </label>
+          <label>
+            <span>{source === 'flowlu' ? 'Category / Segment (optional)' : 'Category'}</span>
+            <input
+              list={source === 'flowlu' ? 'flowlu-category-options' : undefined}
+              placeholder={source === 'flowlu' ? 'e.g. Dholera Investor' : 'Contact'}
+              value={form.category}
+              onChange={(event) => setForm((previous) => ({ ...previous, category: event.target.value }))}
+            />
+            {source === 'flowlu' && (
+              <datalist id="flowlu-category-options">
+                {categories.filter((category) => category !== 'Flowlu CRM').map((category) => (
+                  <option key={category} value={category}/>
+                ))}
+              </datalist>
+            )}
+          </label>
+          <label>
+            <span>Status</span>
+            <select
+              value={form.status}
+              onChange={(event) => setForm((previous) => ({
+                ...previous,
+                status: event.target.value as 'Active' | 'Inactive',
+              }))}
+            >
+              <option value="Active">Active</option>
+              <option value="Inactive">Inactive</option>
+            </select>
+          </label>
+          <button className="btn contact-add-button" disabled={adding}>
+            <Plus size={16}/>
+            {adding ? 'Adding…' : source === 'flowlu' ? 'Add to Flowlu' : 'Add Contact'}
+          </button>
+        </form>
+        {source === 'flowlu' && (
+          <small className="flowlu-add-help">
+            Category must already exist in Flowlu. Leave it blank if you do not want to assign a segment.
+          </small>
+        )}
+      </section>
 
       <section className="card contacts-full-card">
         <div className="contacts-list-toolbar">

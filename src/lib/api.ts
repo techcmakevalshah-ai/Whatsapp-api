@@ -120,7 +120,8 @@ export function addContact(payload: {
   phone: string;
   category?: string;
   status?: 'Active' | 'Inactive';
-}): Promise<{ contact: Contact; contacts: Contact[]; syncedAt: string }> {
+  source?: ContactSource;
+}): Promise<{ contact: Contact; contacts: Contact[]; source?: ContactSource; syncedAt: string }> {
   return json('/api/contacts', { method: 'POST', body: JSON.stringify(payload) });
 }
 
