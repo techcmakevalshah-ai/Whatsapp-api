@@ -22,6 +22,8 @@ import {
 
 function extractFlowluWebhookId(body: any) {
   const candidates = [
+    body?.current?.id,
+    body?.previous?.id,
     body?.id,
     body?.entity_id,
     body?.record_id,
@@ -44,6 +46,7 @@ function extractFlowluWebhookId(body: any) {
 
 function flowluWebhookAction(body: any) {
   return String(
+    body?.meta?.action ||
     body?.action ||
     body?.event?.action ||
     body?.event_action ||
