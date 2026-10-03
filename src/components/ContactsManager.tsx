@@ -1,6 +1,6 @@
 import { Ban, CheckCircle2, Eye, Plus, RefreshCw, Search, UserRound } from 'lucide-react';
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
-import { addContact, setContactStatus } from '../lib/api';
+import { addContact, getContacts, setContactStatus } from '../lib/api';
 import type { Contact, ContactSource } from '../types';
 import { FlowluContactDrawer } from './FlowluContactDrawer';
 
@@ -27,6 +27,7 @@ export function ContactsManager({
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState<'all' | 'Active' | 'Inactive'>('all');
   const [adding, setAdding] = useState(false);
+  const [forceRefreshing, setForceRefreshing] = useState(false);
   const [changingStatusId, setChangingStatusId] = useState('');
   const [localError, setLocalError] = useState('');
   const [detailContact, setDetailContact] = useState<Contact | null>(null);
@@ -87,6 +88,24 @@ export function ContactsManager({
     }
   };
 
+  const refresh = async () => {
+    if (source !== 'flowlu') {
+      await onRefresh();
+      return;
+    }
+
+    setForceRefreshing(true);
+    setLocalError('');
+    try {
+      const result = await getContacts('flowlu', true);
+      onChanged(result.contacts, result.syncedAt);
+    } catch (err) {
+      setLocalError(err instanceof Error ? err.message : 'Unable to refresh Flowlu contacts.');
+    } finally {
+      setForceRefreshing(false);
+    }
+  };
+
   const changeStatus = async (contact: Contact) => {
     if (source === 'flowlu') return;
     const nextStatus = contact.status === 'Active' ? 'Inactive' : 'Active';
@@ -109,6 +128,8 @@ export function ContactsManager({
     }
   };
 
+  const refreshing = loading || forceRefreshing;
+
   return (
     <div className="contacts-page">
       <div className="contacts-page-head">
@@ -122,12 +143,12 @@ export function ContactsManager({
         </div>
         <div className="contacts-source-actions">
           <div className="contacts-source-toggle">
-            <button type="button" className={source === 'sheet' ? 'active' : ''} onClick={() => onSourceChange('sheet')} disabled={loading}>Excel Sheet</button>
-            <button type="button" className={source === 'flowlu' ? 'active' : ''} onClick={() => onSourceChange('flowlu')} disabled={loading}>Flowlu CRM</button>
+            <button type="button" className={source === 'sheet' ? 'active' : ''} onClick={() => onSourceChange('sheet')} disabled={refreshing}>Excel Sheet</button>
+            <button type="button" className={source === 'flowlu' ? 'active' : ''} onClick={() => onSourceChange('flowlu')} disabled={refreshing}>Flowlu CRM</button>
           </div>
-          <button className="btn secondary" onClick={() => void onRefresh()} disabled={loading}>
-            <RefreshCw size={16} className={loading ? 'spin' : ''}/>
-            {loading ? 'Refreshing…' : 'Refresh'}
+          <button className="btn secondary" onClick={() => void refresh()} disabled={refreshing}>
+            <RefreshCw size={16} className={refreshing ? 'spin' : ''}/>
+            {refreshing ? 'Refreshing…' : source === 'flowlu' ? 'Refresh from Flowlu' : 'Refresh'}
           </button>
         </div>
       </div>
