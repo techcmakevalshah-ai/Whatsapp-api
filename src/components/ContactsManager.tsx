@@ -52,6 +52,18 @@ export function ContactsManager({
     setForm({ name: '', phone: '', category: '', status: 'Active' });
   }, [source]);
 
+  useEffect(() => {
+    if (source !== 'flowlu') return;
+
+    const timer = window.setInterval(() => {
+      if (document.visibilityState === 'visible' && !loading && !forceRefreshing) {
+        void onRefresh();
+      }
+    }, 10_000);
+
+    return () => window.clearInterval(timer);
+  }, [source, onRefresh, loading, forceRefreshing]);
+
   const filtered = useMemo(() => {
     const term = query.trim().toLowerCase();
     return contacts.filter((contact) => {
