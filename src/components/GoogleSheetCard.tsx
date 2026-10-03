@@ -1,4 +1,5 @@
 import { Database, RefreshCw, Sheet } from 'lucide-react';
+import { useEffect } from 'react';
 import type { ContactSource } from '../types';
 
 export function GoogleSheetCard({ source, syncedAt, loading, onRefresh, onSourceChange, error }: {
@@ -11,6 +12,17 @@ export function GoogleSheetCard({ source, syncedAt, loading, onRefresh, onSource
 }) {
   const connected = Boolean(syncedAt) && !error;
   const sourceName = source === 'flowlu' ? 'Flowlu CRM' : 'Excel / Google Sheet';
+
+  useEffect(() => {
+    if (source !== 'flowlu') return;
+
+    const timer = window.setInterval(() => {
+      if (document.visibilityState === 'visible') onRefresh();
+    }, 10_000);
+
+    return () => window.clearInterval(timer);
+  }, [source, onRefresh]);
+
   return (
     <section className="card soft-green contact-source-card">
       <div className="section-title"><span className="step green">1</span> Contact Source</div>
