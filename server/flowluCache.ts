@@ -1,8 +1,8 @@
 import { supabaseAdmin } from './supabaseAdmin.js';
 import {
-  fetchFlowluContacts,
   type FlowluContact,
 } from './flowluContacts.js';
+import { fetchAllFlowluContactsReliable } from './flowluReliableSync.js';
 
 function cacheMissing(error: any) {
   const text = String(error?.message || error?.code || error || '');
@@ -124,7 +124,7 @@ async function updateSyncState(input: {
 
 export async function syncFlowluContactsToCache(): Promise<{ contacts: FlowluContact[]; cacheEnabled: boolean; syncedAt: string }> {
   try {
-    const contacts = await fetchFlowluContacts(true);
+    const contacts = await fetchAllFlowluContactsReliable();
     let cacheEnabled = true;
 
     try {
