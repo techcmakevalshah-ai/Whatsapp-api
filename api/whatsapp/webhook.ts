@@ -1,6 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import crypto from 'node:crypto';
 import { supabaseAdmin } from '../../server/supabaseAdmin.js';
+import { writeBackFlowluWhatsAppStatus } from '../../server/flowluWhatsApp.js';
 
 const ALLOWED_STATUSES = new Set(['sent', 'delivered', 'read', 'failed']);
 const STATUS_RANK: Record<string, number> = {
@@ -143,7 +144,7 @@ async function findRecipientByMessageId(
 ) {
   const { data, error } = await sb
     .from('campaign_recipients')
-    .select('id, status, provider_message_id, sent_at')
+    .select('id, status, provider_message_id, sent_at, phone, category, campaign:campaigns!inner(name,template_name)')
     .eq('provider_message_id', messageId)
     .maybeSingle();
 
@@ -163,7 +164,7 @@ async function findRecentRecipientFallback(
 
   let query = sb
     .from('campaign_recipients')
-    .select('id, status, provider_message_id, sent_at, campaign:campaigns!inner(template_name)')
+    .select('id, status, provider_message_id, sent_at, phone, category, campaign:campaigns!inner(name,template_name)')
     .eq('phone', phone)
     .not('sent_at', 'is', null)
     .gte('sent_at', earliest)
@@ -218,6 +219,7 @@ async function applyStatus(
   const currentStatus = String(recipient.status || '');
   const timestamp = isoFromTimestamp(candidate.timestamp);
   const update: Record<string, unknown> = {};
+  let meaningfulFlowluStatus: 'Read' | 'Failed' | null = null;
 
   if (candidate.resolvedMessageId) {
     update.provider_message_id = candidate.resolvedMessageId;
@@ -238,12 +240,14 @@ async function applyStatus(
   if (candidate.status === 'read') {
     update.status = 'Read';
     update.read_at = timestamp;
+    if (currentStatus !== 'Read') meaningfulFlowluStatus = 'Read';
   }
 
   if (candidate.status === 'failed') {
     if (!['Delivered', 'Read'].includes(currentStatus)) {
       update.status = 'Failed';
       update.error_message = candidate.error || 'WhatsApp delivery failed';
+      if (currentStatus !== 'Failed') meaningfulFlowluStatus = 'Failed';
     }
   }
 
@@ -254,12 +258,28 @@ async function applyStatus(
 
   if (updateError) throw updateError;
 
+  let flowluNote = '';
+  if (meaningfulFlowluStatus) {
+    const campaign = Array.isArray((recipient as any).campaign)
+      ? (recipient as any).campaign[0]
+      : (recipient as any).campaign;
+    const result = await writeBackFlowluWhatsAppStatus({
+      category: (recipient as any).category,
+      phone: (recipient as any).phone,
+      status: meaningfulFlowluStatus,
+      campaignName: String(campaign?.name || 'WhatsApp Campaign'),
+      templateName: String(campaign?.template_name || candidate.templateName || ''),
+      occurredAt: timestamp,
+      error: candidate.error,
+    });
+    if (result.written) flowluNote = ' Flowlu activity added.';
+  }
+
   return {
     matched: true,
-    note: `${linkedByFallback ? 'Linked wamid using phone/template/time fallback. ' : ''}Updated recipient to ${String(update.status || currentStatus)}.`,
+    note: `${linkedByFallback ? 'Linked wamid using phone/template/time fallback. ' : ''}Updated recipient to ${String(update.status || currentStatus)}.${flowluNote}`,
   };
 }
-
 
 function extractVerificationChallenge(req: VercelRequest) {
   const direct = firstString(
@@ -379,8 +399,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  // Some webhook providers verify URLs with a POST challenge instead of GET.
-  // Echo it exactly before treating the request as a WhatsApp event.
   if (challenge) {
     await logVerificationAttempt(req, challenge);
     return res
@@ -397,8 +415,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     ];
     const sb = supabaseAdmin();
 
-    // If OfficialWA performs a POST reachability check without a challenge,
-    // accept it and log the exact payload so we can see its verification shape.
     if (!candidates.length && !body?.entry?.length) {
       await logVerificationAttempt(req, null);
       return res.status(200).json({ ok: true });
