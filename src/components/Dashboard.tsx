@@ -15,6 +15,7 @@ import {
   Workflow,
 } from 'lucide-react';
 import type { Contact, DashboardStats, WhatsAppTemplate } from '../types';
+import { DashboardReminders } from './DashboardReminders';
 
 function pct(part: number, total: number) {
   if (!total) return '0%';
@@ -119,6 +120,8 @@ export function Dashboard({
           </div>
         </article>
       </div>
+
+      <DashboardReminders />
 
       <div className="dashboard-main-grid">
         <article className="dashboard-panel dashboard-activity-panel">
