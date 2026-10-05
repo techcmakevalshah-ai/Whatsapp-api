@@ -30,6 +30,16 @@ export type FlowluSalesMeta = {
   users: FlowluOption[];
 };
 
+export type FlowluLeadContext = {
+  accountId: number;
+  leadId: number;
+  leadName: string;
+  pipelineId: number | null;
+  stageId: number | null;
+  budget: number;
+  assigneeId: number | null;
+};
+
 export type WhatsAppTemplate = {
   id: string;
   name: string;
@@ -119,18 +129,18 @@ export type MessageSeriesStep = {
 export type MessageSeries = {
   id: string;
   name: string;
-  description?: string | null;
-  status: 'READY' | 'INACTIVE' | string;
+  status: 'DRAFT' | 'READY' | string;
+  totalDays: number;
+  steps: MessageSeriesStep[];
   createdAt: string;
   updatedAt: string;
-  steps: MessageSeriesStep[];
 };
 
 export type MessageSeriesScheduleSummary = {
   id: string;
+  name: string;
   seriesId: string;
   seriesName: string;
-  name: string;
   status: 'active' | 'paused' | 'completed' | 'canceled' | string;
   timezone: string;
   startAt: string;
@@ -146,8 +156,7 @@ export type MessageSeriesScheduleSummary = {
 export type TemplateFolder = {
   id: string;
   name: string;
-  description?: string | null;
-  active: boolean;
+  sortOrder: number;
   createdAt: string;
   updatedAt: string;
 };
@@ -162,48 +171,22 @@ export type StaffProfile = {
 
 export type StaffUserProfile = StaffProfile & {
   active: boolean;
-  revokedAt?: string | null;
-  createdAt: string;
-  updatedAt: string;
-  emailConfirmedAt?: string | null;
-  invitedAt?: string | null;
-  lastSignInAt?: string | null;
-  authStatus: 'invited' | 'registered' | string;
-};
-
-
-export type DashboardDailyPoint = {
-  day: string;
-  sent: number;
-  delivered: number;
-  read: number;
-  failed: number;
-};
-
-export type DashboardRecentCampaign = {
-  id: string;
-  name: string;
-  templateName: string;
-  status: string;
-  createdAt: string;
-  scheduledAt?: string | null;
-  totalRecipients: number;
-  sent: number;
-  delivered: number;
-  read: number;
-  failed: number;
+  createdAt?: string | null;
+  updatedAt?: string | null;
 };
 
 export type DashboardStats = {
-  campaignsTotal: number;
-  messagesTotal: number;
-  sent: number;
-  delivered: number;
-  read: number;
-  failed: number;
-  scheduled: number;
-  activeRecurring: number;
-  activeSeries: number;
-  daily: DashboardDailyPoint[];
-  recentCampaigns: DashboardRecentCampaign[];
+  totalContacts: number;
+  activeContacts: number;
+  templatesReady: number;
+  totalCampaigns: number;
+  totalRecipients: number;
+  sentCount: number;
+  deliveredCount: number;
+  readCount: number;
+  failedCount: number;
+  deliveryRate: number;
+  readRate: number;
+  failedRate: number;
+  recentCampaigns: CampaignSummary[];
 };
