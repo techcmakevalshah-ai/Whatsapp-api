@@ -1,0 +1,252 @@
+.dashboard-reminders-panel {
+  overflow: hidden;
+}
+
+.dashboard-reminders-head h2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.dashboard-reminder-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin: 2px 0 16px;
+}
+
+.dashboard-reminder-summary > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 58px;
+  padding: 12px 14px;
+  border: 1px solid #e8edf5;
+  border-radius: 12px;
+  background: #f8fafc;
+}
+
+.dashboard-reminder-summary span {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.dashboard-reminder-summary strong {
+  font-size: 24px;
+  line-height: 1;
+  color: #0f172a;
+}
+
+.dashboard-reminder-summary > div.danger {
+  border-color: #fecaca;
+  background: #fff7f7;
+}
+
+.dashboard-reminder-summary > div.danger strong,
+.dashboard-reminder-summary > div.danger span {
+  color: #b91c1c;
+}
+
+.dashboard-reminder-list {
+  display: grid;
+  gap: 8px;
+}
+
+.dashboard-reminder-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 13px;
+  border: 1px solid #e8edf5;
+  border-radius: 12px;
+  background: #fff;
+}
+
+.dashboard-reminder-row.overdue {
+  border-color: #fecaca;
+  background: #fffafa;
+}
+
+.dashboard-reminder-icon {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  background: #eef4ff;
+  color: #3157d5;
+}
+
+.dashboard-reminder-row.overdue .dashboard-reminder-icon {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.dashboard-reminder-copy {
+  min-width: 0;
+}
+
+.dashboard-reminder-title-line {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.dashboard-reminder-title-line b {
+  color: #0f172a;
+  font-size: 14px;
+}
+
+.dashboard-reminder-title-line > span {
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.dashboard-reminder-title-line > span.overdue-label {
+  color: #b91c1c;
+}
+
+.dashboard-reminder-meta {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-top: 4px;
+  color: #64748b;
+  font-size: 12px;
+}
+
+.dashboard-reminder-meta span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.dashboard-reminder-note {
+  max-width: 460px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dashboard-reminder-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.dashboard-reminder-actions button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 32px;
+  padding: 0 9px;
+  border: 1px solid #dbe3ee;
+  border-radius: 9px;
+  background: #fff;
+  color: #475569;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.dashboard-reminder-actions button:hover:not(:disabled) {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+}
+
+.dashboard-reminder-actions button.done {
+  border-color: #bbf7d0;
+  background: #f0fdf4;
+  color: #15803d;
+}
+
+.dashboard-reminder-actions button:disabled {
+  opacity: .55;
+  cursor: default;
+}
+
+.dashboard-reminder-error {
+  margin-bottom: 10px;
+  padding: 9px 11px;
+  border-radius: 9px;
+  background: #fff1f2;
+  color: #be123c;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.dashboard-reminder-empty {
+  min-height: 96px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 18px;
+  border: 1px dashed #dbe3ee;
+  border-radius: 12px;
+  color: #64748b;
+}
+
+.dashboard-reminder-empty div {
+  display: grid;
+  gap: 2px;
+}
+
+.dashboard-reminder-empty b {
+  color: #334155;
+  font-size: 13px;
+}
+
+.dashboard-reminder-empty span {
+  font-size: 12px;
+}
+
+.dashboard-reminder-more {
+  padding: 8px 4px 0;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 600;
+  text-align: center;
+}
+
+@media (max-width: 920px) {
+  .dashboard-reminder-row {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .dashboard-reminder-actions {
+    grid-column: 1 / -1;
+    padding-left: 46px;
+  }
+}
+
+@media (max-width: 620px) {
+  .dashboard-reminder-summary {
+    grid-template-columns: 1fr;
+  }
+
+  .dashboard-reminders-head {
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .dashboard-reminder-row {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .dashboard-reminder-actions {
+    grid-column: 1 / -1;
+    padding-left: 0;
+    flex-wrap: wrap;
+  }
+
+  .dashboard-reminder-actions button span {
+    display: none;
+  }
+}
