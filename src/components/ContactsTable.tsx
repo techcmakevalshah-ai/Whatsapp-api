@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { getFlowluSalesMeta } from '../lib/api';
 import { getFlowluOpportunityAudience } from '../lib/flowluAudience';
 import type { Contact, ContactSource, FlowluLeadContext, FlowluSalesMeta } from '../types';
+import './ContactsTable.flowlu.css';
 
 type FilterMode = 'all' | 'active' | 'inactive';
 
