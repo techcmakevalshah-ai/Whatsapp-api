@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { addContact, getContacts, setContactStatus } from '../lib/api';
 import type { Contact, ContactSource } from '../types';
 import { FlowluContactDrawer } from './FlowluContactDrawer';
+import { FlowluCategorySelector } from './FlowluCategorySelector';
 
 export function ContactsManager({
   contacts,
@@ -52,32 +53,17 @@ export function ContactsManager({
     setForm({ name: '', phone: '', category: '', status: 'Active' });
   }, [source]);
 
-  useEffect(() => {
-    if (source !== 'flowlu') return;
-
-    const timer = window.setInterval(() => {
-      if (document.visibilityState !== 'visible') return;
-      void getContacts('flowlu')
-        .then((result) => onChanged(result.contacts, result.syncedAt))
-        .catch(() => {
-          // Silent cache polling should never lock or disturb the UI.
-        });
-    }, 15_000);
-
-    return () => window.clearInterval(timer);
-  }, [source]);
-
   const filtered = useMemo(() => {
     const term = query.trim().toLowerCase();
     return contacts.filter((contact) => {
       const matchesSearch = !term || (contact.name + ' ' + contact.phone + ' ' + contact.category + ' ' + contact.status)
         .toLowerCase()
         .includes(term);
-      const matchesCategory = categoryFilter === 'all' || contact.category === categoryFilter;
+      const matchesCategory = source === 'flowlu' || categoryFilter === 'all' || contact.category === categoryFilter;
       const matchesStatus = statusFilter === 'all' || contact.status === statusFilter;
       return matchesSearch && matchesCategory && matchesStatus;
     });
-  }, [contacts, query, categoryFilter, statusFilter]);
+  }, [contacts, query, categoryFilter, statusFilter, source]);
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
@@ -112,10 +98,10 @@ export function ContactsManager({
     setForceRefreshing(true);
     setLocalError('');
     try {
-      const result = await getContacts('flowlu', 'recent', query.trim());
+      const result = await getContacts('flowlu', true);
       onChanged(result.contacts, result.syncedAt);
     } catch (err) {
-      setLocalError(err instanceof Error ? err.message : 'Unable to refresh Flowlu contacts.');
+      setLocalError(err instanceof Error ? err.message : 'Unable to refresh the selected Flowlu segment.');
     } finally {
       setForceRefreshing(false);
     }
@@ -153,7 +139,7 @@ export function ContactsManager({
           <h1>Contacts</h1>
           <p>
             {source === 'flowlu'
-              ? 'Live contacts from Flowlu CRM. Add new Flowlu contacts here; edit or deactivate existing contacts in Flowlu.'
+              ? 'Choose a Flowlu segment first. Only contacts from that segment are loaded, so the CRM stays fast.'
               : 'Live contacts from your Excel / Google Sheet. Contacts can be added or deactivated; permanent deletion is blocked.'}
           </p>
         </div>
@@ -162,9 +148,12 @@ export function ContactsManager({
             <button type="button" className={source === 'sheet' ? 'active' : ''} onClick={() => onSourceChange('sheet')} disabled={switchingSource}>Excel Sheet</button>
             <button type="button" className={source === 'flowlu' ? 'active' : ''} onClick={() => onSourceChange('flowlu')} disabled={switchingSource}>Flowlu CRM</button>
           </div>
+          {source === 'flowlu' && (
+            <FlowluCategorySelector loading={switchingSource} compact onApply={onRefresh}/>
+          )}
           <button className="btn secondary" onClick={() => void refresh()} disabled={refreshing}>
             <RefreshCw size={16} className={refreshing ? 'spin' : ''}/>
-            {refreshing ? 'Refreshing…' : source === 'flowlu' ? 'Refresh from Flowlu' : 'Refresh'}
+            {refreshing ? 'Refreshing…' : source === 'flowlu' ? 'Refresh Segment' : 'Refresh'}
           </button>
         </div>
       </div>
@@ -238,14 +227,19 @@ export function ContactsManager({
       <section className="card contacts-full-card">
         <div className="contacts-list-toolbar">
           <div>
-            <div className="section-title contacts-list-title"><UserRound size={18}/> All {source === 'flowlu' ? 'Flowlu CRM' : 'Excel Sheet'} Contacts</div>
-            <small>{contacts.length} contact{contacts.length === 1 ? '' : 's'}{syncedAt ? ' · Last synced ' + new Date(syncedAt).toLocaleString() : ''}</small>
+            <div className="section-title contacts-list-title"><UserRound size={18}/> {source === 'flowlu' ? 'Selected Flowlu Segment' : 'All Excel Sheet Contacts'}</div>
+            <small>
+              {contacts.length} contact{contacts.length === 1 ? '' : 's'}
+              {syncedAt ? ' · Last loaded ' + new Date(syncedAt).toLocaleString() : source === 'flowlu' ? ' · Select a segment above' : ''}
+            </small>
           </div>
           <div className="contacts-manager-filters">
-            <div className="search contacts-search"><Search size={17}/><input placeholder="Search name, mobile, category or status…" value={query} onChange={(event) => setQuery(event.target.value)}/></div>
-            <select className="filter-select" value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)}>
-              <option value="all">{source === 'flowlu' ? 'All segments' : 'All categories'}</option>{categories.map((category) => <option key={category} value={category}>{category}</option>)}
-            </select>
+            <div className="search contacts-search"><Search size={17}/><input placeholder="Search name, mobile or status…" value={query} onChange={(event) => setQuery(event.target.value)}/></div>
+            {source === 'sheet' && (
+              <select className="filter-select" value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)}>
+                <option value="all">All categories</option>{categories.map((category) => <option key={category} value={category}>{category}</option>)}
+              </select>
+            )}
             <select className="filter-select" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as 'all' | 'Active' | 'Inactive')}>
               <option value="all">All status</option><option value="Active">Active</option><option value="Inactive">Inactive</option>
             </select>
@@ -282,7 +276,11 @@ export function ContactsManager({
               ))}
               {!filtered.length && (
                 <tr><td colSpan={6}><div className="contacts-empty">
-                  {contacts.length ? 'No contacts match your search.' : source === 'flowlu' ? 'No Flowlu CRM contacts with a mobile number were found.' : 'No contacts found in the Excel / Google Sheet.'}
+                  {contacts.length
+                    ? 'No contacts match your search.'
+                    : source === 'flowlu'
+                      ? 'Select a Flowlu segment above. Only that segment will be loaded.'
+                      : 'No contacts found in the Excel / Google Sheet.'}
                 </div></td></tr>
               )}
             </tbody>
