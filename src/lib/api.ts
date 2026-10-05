@@ -20,15 +20,23 @@ async function json<T>(url: string, init?: RequestInit): Promise<T> {
   return body as T;
 }
 
-export function getContacts(source: ContactSource = 'sheet', force = false): Promise<{
+export function getContacts(
+  source: ContactSource = 'sheet',
+  refresh: boolean | 'recent' = false,
+  search = '',
+): Promise<{
   contacts: Contact[];
   source: ContactSource;
   syncedAt: string;
-  syncMode?: 'cache' | 'live';
+  syncMode?: 'cache' | 'live' | 'recent';
   cacheEnabled?: boolean;
 }> {
-  const forceQuery = force ? '&force=1' : '';
-  return json('/api/contacts?source=' + encodeURIComponent(source) + forceQuery);
+  const refreshQuery = refresh === 'recent'
+    ? '&refresh=recent' + (search.trim() ? '&search=' + encodeURIComponent(search.trim()) : '')
+    : refresh
+      ? '&force=1'
+      : '';
+  return json('/api/contacts?source=' + encodeURIComponent(source) + refreshQuery);
 }
 
 export function getTemplates(): Promise<{ templates: WhatsAppTemplate[] }> {
@@ -324,7 +332,6 @@ export function completePasswordSetup(): Promise<{ ok: true }> {
   });
 }
 
-
 export function getFlowluSalesMeta(): Promise<FlowluSalesMeta> {
   return json('/api/contacts?action=flowlu-meta');
 }
@@ -343,7 +350,6 @@ export function createFlowluOpportunity(payload: {
     body: JSON.stringify(payload),
   });
 }
-
 
 export function createFlowluFollowupTask(payload: {
   accountId: number;
