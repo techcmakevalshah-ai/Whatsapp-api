@@ -98,7 +98,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const sb = supabaseAdmin();
 
     if (recurringDays !== null) {
-      // Validate dynamic variables against the current selected contacts before saving the series.
       selectedContacts.forEach((contact) => {
         resolveVariableMap(variableValues || {}, contact, template.variables);
       });
@@ -178,7 +177,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       campaign_id: campaignId,
       name: contact.name,
       phone: contact.phone,
-      category: contact.category,
+      category: encodeSourceCategory(source, contact.category),
       status: 'Queued',
       variables: resolveVariableMap(variableValues || {}, contact, template.variables),
     }));
