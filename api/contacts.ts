@@ -2,6 +2,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { requireStaff } from '../server/auth.js';
 import { addSheetContact, fetchSheetContacts, setSheetContactStatus } from '../server/googleSheets.js';
 import { fetchContactsForSource, normalizeContactSource } from '../server/contactSources.js';
+import { handleReminderRequest } from '../server/reminders.js';
 import {
   createFlowluContact,
   fetchFlowluCategories,
@@ -146,6 +147,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   const source = normalizeContactSource(req.query.source || req.body?.source);
   const action = String(req.query.action || req.body?.action || '').trim().toLowerCase();
+
+  if (action === 'reminders' || action.startsWith('reminder-')) {
+    return handleReminderRequest(req, res, user, action);
+  }
 
   try {
     if (req.method === 'GET' && action === 'flowlu-meta') {
