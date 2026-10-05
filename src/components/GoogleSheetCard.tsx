@@ -1,6 +1,6 @@
 import { Database, RefreshCw, Sheet } from 'lucide-react';
-import { useEffect } from 'react';
 import type { ContactSource } from '../types';
+import { FlowluCategorySelector } from './FlowluCategorySelector';
 
 export function GoogleSheetCard({ source, syncedAt, loading, onRefresh, onSourceChange, error }: {
   source: ContactSource;
@@ -13,16 +13,6 @@ export function GoogleSheetCard({ source, syncedAt, loading, onRefresh, onSource
   const connected = Boolean(syncedAt) && !error;
   const sourceName = source === 'flowlu' ? 'Flowlu CRM' : 'Excel / Google Sheet';
 
-  useEffect(() => {
-    if (source !== 'flowlu') return;
-
-    const timer = window.setInterval(() => {
-      if (document.visibilityState === 'visible') onRefresh();
-    }, 10_000);
-
-    return () => window.clearInterval(timer);
-  }, [source, onRefresh]);
-
   return (
     <section className="card soft-green contact-source-card">
       <div className="section-title"><span className="step green">1</span> Contact Source</div>
@@ -31,19 +21,38 @@ export function GoogleSheetCard({ source, syncedAt, loading, onRefresh, onSource
           <Sheet size={17}/><span><b>Excel Sheet</b><small>Google Sheets API</small></span>
         </button>
         <button type="button" className={source === 'flowlu' ? 'active' : ''} onClick={() => onSourceChange('flowlu')} disabled={loading}>
-          <Database size={17}/><span><b>Flowlu CRM</b><small>Live CRM contacts</small></span>
+          <Database size={17}/><span><b>Flowlu CRM</b><small>Load contacts by segment</small></span>
         </button>
       </div>
+
+      {source === 'flowlu' && (
+        <FlowluCategorySelector loading={loading} onApply={onRefresh}/>
+      )}
+
       <div className="sheet-row">
         <div className="sheet-icon">{source === 'flowlu' ? <Database size={24}/> : <Sheet size={24}/>}</div>
-        <div className="grow"><b>{sourceName}</b><small>{connected ? (source === 'flowlu' ? 'Connected through Flowlu CRM API' : 'Connected through Google Sheets API') : sourceName + ' connection required'}</small></div>
+        <div className="grow">
+          <b>{sourceName}</b>
+          <small>
+            {source === 'flowlu'
+              ? connected
+                ? 'Selected Flowlu segment loaded'
+                : 'Choose a Flowlu segment above to load contacts'
+              : connected
+                ? 'Connected through Google Sheets API'
+                : sourceName + ' connection required'}
+          </small>
+        </div>
         <span className={connected ? 'status-dot' : 'status-dot status-dot-off'}></span>
-        <span className={connected ? 'connected' : 'disconnected'}>{connected ? 'Connected' : 'Not connected'}</span>
+        <span className={connected ? 'connected' : 'disconnected'}>{connected ? 'Loaded' : source === 'flowlu' ? 'Select segment' : 'Not connected'}</span>
       </div>
       {error && <div className="inline-error">{error}</div>}
       <div className="card-footer">
-        <small>Last synced: {syncedAt ? new Date(syncedAt).toLocaleString() : 'Not synced'}</small>
-        <button className="btn secondary" onClick={onRefresh} disabled={loading}><RefreshCw size={16} className={loading ? 'spin' : ''}/> {loading ? 'Refreshing…' : 'Refresh Contacts'}</button>
+        <small>Last loaded: {syncedAt ? new Date(syncedAt).toLocaleString() : 'Select a segment'}</small>
+        <button className="btn secondary" onClick={onRefresh} disabled={loading}>
+          <RefreshCw size={16} className={loading ? 'spin' : ''}/>
+          {loading ? 'Refreshing…' : source === 'flowlu' ? 'Refresh Segment' : 'Refresh Contacts'}
+        </button>
       </div>
     </section>
   );
