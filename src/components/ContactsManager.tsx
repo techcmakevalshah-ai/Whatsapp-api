@@ -4,6 +4,7 @@ import { addContact, getContacts, setContactStatus } from '../lib/api';
 import type { Contact, ContactSource } from '../types';
 import { FlowluContactDrawer } from './FlowluContactDrawer';
 import { FlowluCategorySelector } from './FlowluCategorySelector';
+import { ReminderCenter } from './ReminderCenter';
 
 export function ContactsManager({
   contacts,
@@ -144,6 +145,7 @@ export function ContactsManager({
           </p>
         </div>
         <div className="contacts-source-actions">
+          <ReminderCenter/>
           <div className="contacts-source-toggle">
             <button type="button" className={source === 'sheet' ? 'active' : ''} onClick={() => onSourceChange('sheet')} disabled={switchingSource}>Excel Sheet</button>
             <button type="button" className={source === 'flowlu' ? 'active' : ''} onClick={() => onSourceChange('flowlu')} disabled={switchingSource}>Flowlu CRM</button>
