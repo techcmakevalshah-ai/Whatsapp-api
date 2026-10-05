@@ -70,11 +70,17 @@ export async function readFlowluContactCache(): Promise<{ contacts: FlowluContac
 }
 
 export async function upsertFlowluContactCache(contact: FlowluContact): Promise<boolean> {
+  return upsertFlowluContactsCache([contact]);
+}
+
+export async function upsertFlowluContactsCache(contacts: FlowluContact[]): Promise<boolean> {
+  if (!contacts.length) return true;
+
   try {
     const sb = supabaseAdmin();
     const { error } = await sb
       .from('flowlu_contacts_cache')
-      .upsert(contactToRow(contact), { onConflict: 'flowlu_id' });
+      .upsert(contacts.map(contactToRow), { onConflict: 'flowlu_id' });
     if (error) throw error;
     return true;
   } catch (error) {
