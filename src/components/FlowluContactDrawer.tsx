@@ -1,4 +1,4 @@
-import { BriefcaseBusiness, CalendarPlus, Mail, MapPin, MessageSquareText, Phone, UserRound, X } from 'lucide-react';
+import { BellRing, BriefcaseBusiness, CalendarPlus, Mail, MapPin, MessageSquareText, Phone, UserRound, X } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import {
   createFlowluContactNote,
@@ -6,6 +6,7 @@ import {
   createFlowluOpportunity,
   getFlowluSalesMeta,
 } from '../lib/api';
+import { createReminder } from '../lib/reminders';
 import type { Contact, FlowluSalesMeta } from '../types';
 
 export function FlowluContactDrawer({ contact, onClose }: {
@@ -37,6 +38,15 @@ export function FlowluContactDrawer({ contact, onClose }: {
     description: '',
   });
 
+  const [reminderSaving, setReminderSaving] = useState(false);
+  const [reminderError, setReminderError] = useState('');
+  const [reminderSuccess, setReminderSuccess] = useState('');
+  const [reminderForm, setReminderForm] = useState({
+    title: '',
+    remindAt: '',
+    note: '',
+  });
+
   const [noteSaving, setNoteSaving] = useState(false);
   const [noteError, setNoteError] = useState('');
   const [noteSuccess, setNoteSuccess] = useState('');
@@ -61,12 +71,19 @@ export function FlowluContactDrawer({ contact, onClose }: {
       responsibleId: ownerId,
       description: '',
     });
+    setReminderForm({
+      title: 'Follow up with ' + contact.name,
+      remindAt: '',
+      note: '',
+    });
     setNoteText('');
 
     setOpportunityError('');
     setOpportunitySuccess('');
     setTaskError('');
     setTaskSuccess('');
+    setReminderError('');
+    setReminderSuccess('');
     setNoteError('');
     setNoteSuccess('');
 
@@ -136,6 +153,35 @@ export function FlowluContactDrawer({ contact, onClose }: {
       setTaskError(err instanceof Error ? err.message : 'Unable to create follow-up task.');
     } finally {
       setTaskSaving(false);
+    }
+  };
+
+  const submitReminder = async () => {
+    if (!reminderForm.title.trim()) return setReminderError('Enter a reminder title.');
+    if (!reminderForm.remindAt) return setReminderError('Choose reminder date and time.');
+    const remindAt = new Date(reminderForm.remindAt);
+    if (Number.isNaN(remindAt.getTime())) return setReminderError('Choose a valid reminder date and time.');
+
+    setReminderSaving(true);
+    setReminderError('');
+    setReminderSuccess('');
+    try {
+      await createReminder({
+        title: reminderForm.title.trim(),
+        note: reminderForm.note.trim() || undefined,
+        remindAt: remindAt.toISOString(),
+        contactSource: 'flowlu',
+        contactId: contact.id,
+        flowluId: contact.flowluId,
+        contactName: contact.name,
+        contactPhone: contact.phone,
+      });
+      setReminderSuccess('Reminder saved. It will appear in My Reminders when due.');
+      setReminderForm((previous) => ({ ...previous, remindAt: '', note: '' }));
+    } catch (err) {
+      setReminderError(err instanceof Error ? err.message : 'Unable to save reminder.');
+    } finally {
+      setReminderSaving(false);
     }
   };
 
@@ -273,6 +319,31 @@ export function FlowluContactDrawer({ contact, onClose }: {
 
           <button type="button" className="btn flowlu-secondary-action" disabled={taskSaving || loadingMeta} onClick={() => void submitTask()}>
             <CalendarPlus size={16}/>{taskSaving ? 'Creating…' : 'Create Follow-up'}
+          </button>
+        </div>
+
+        <div className="flowlu-crm-action-box">
+          <div className="flowlu-opportunity-title"><BellRing size={16}/><b>Set App Reminder</b></div>
+          {reminderError && <div className="inline-error">{reminderError}</div>}
+          {reminderSuccess && <div className="flowlu-success">{reminderSuccess}</div>}
+
+          <label>
+            <span>Reminder</span>
+            <input value={reminderForm.title} onChange={(e) => setReminderForm((p) => ({ ...p, title: e.target.value }))}/>
+          </label>
+
+          <label>
+            <span>Remind Date & Time *</span>
+            <input type="datetime-local" value={reminderForm.remindAt} onChange={(e) => setReminderForm((p) => ({ ...p, remindAt: e.target.value }))}/>
+          </label>
+
+          <label>
+            <span>Note</span>
+            <textarea rows={3} placeholder="What should I remember for this follow-up?" value={reminderForm.note} onChange={(e) => setReminderForm((p) => ({ ...p, note: e.target.value }))}/>
+          </label>
+
+          <button type="button" className="btn flowlu-secondary-action" disabled={reminderSaving} onClick={() => void submitReminder()}>
+            <BellRing size={16}/>{reminderSaving ? 'Saving…' : 'Set Reminder'}
           </button>
         </div>
 
