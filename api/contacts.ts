@@ -4,8 +4,11 @@ import { addSheetContact, fetchSheetContacts, setSheetContactStatus } from '../s
 import { fetchContactsForSource, normalizeContactSource } from '../server/contactSources.js';
 import {
   createFlowluContact,
+  fetchFlowluCategories,
   fetchFlowluContactById,
+  flowluGet,
   invalidateFlowluMemoryCache,
+  mapFlowluContact,
 } from '../server/flowluContacts.js';
 import {
   deleteFlowluContactCache,
@@ -124,6 +127,42 @@ async function handleFlowluWebhook(req: VercelRequest, res: VercelResponse) {
   }
 }
 
+async function refreshRecentFlowluContacts(search: string) {
+  const cached = await getFlowluContactsSmart(false);
+  const categories = await fetchFlowluCategories();
+  const categoryMap = new Map(categories.map((item) => [item.id, item.name] as const));
+
+  const query: Record<string, string | number> = {
+    page: 1,
+    limit: 200,
+  };
+  if (search) query.search = search;
+
+  const data = await flowluGet('crm/account/list', query);
+  const items = Array.isArray(data?.response?.items) ? data.response.items : [];
+  const recent = items
+    .map((row: any) => mapFlowluContact(row, categoryMap))
+    .filter((contact): contact is NonNullable<typeof contact> => Boolean(contact));
+
+  const merged = new Map(cached.contacts.map((contact) => [contact.flowluId || Number(contact.id.replace('flowlu:', '')), contact]));
+
+  for (const contact of recent) {
+    const existing = merged.get(contact.flowluId);
+    merged.set(contact.flowluId, contact);
+    if (!existing) {
+      await upsertFlowluContactCache(contact);
+    }
+  }
+
+  const contacts = [...merged.values()].sort((a, b) => a.name.localeCompare(b.name));
+  return {
+    contacts,
+    syncedAt: new Date().toISOString(),
+    syncMode: 'recent' as const,
+    cacheEnabled: cached.cacheEnabled,
+  };
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (String(req.query.flowluWebhook || '') === '1') {
     return handleFlowluWebhook(req, res);
@@ -179,6 +218,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     if (req.method === 'GET') {
       if (source === 'flowlu') {
+        const refresh = String(req.query.refresh || '');
+        if (refresh === 'recent') {
+          const result = await refreshRecentFlowluContacts(String(req.query.search || '').trim());
+          res.setHeader('Cache-Control', 'no-store');
+          return res.status(200).json({
+            contacts: result.contacts,
+            source,
+            syncedAt: result.syncedAt,
+            syncMode: result.syncMode,
+            cacheEnabled: result.cacheEnabled,
+          });
+        }
+
         const force = String(req.query.force || '') === '1';
         const result = await getFlowluContactsSmart(force);
         res.setHeader('Cache-Control', 'no-store');
