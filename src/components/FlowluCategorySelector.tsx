@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Database } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import './FlowluCategorySelector.css';
 
 type FlowluCategory = {
   id: number;
