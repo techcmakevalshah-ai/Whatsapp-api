@@ -1,11 +1,12 @@
 import { supabaseAdmin } from './supabaseAdmin.js';
 import { sendTemplateMessage } from './whatsapp.js';
+import { writeBackFlowluWhatsAppStatus } from './flowluWhatsApp.js';
 
 export async function processCampaignBatch(campaignId: string, limit = 20) {
   const sb = supabaseAdmin();
   const { data: campaign, error: campaignError } = await sb
     .from('campaigns')
-    .select('id, template_name, template_language, header_type, media_url')
+    .select('id, name, template_name, template_language, header_type, media_url')
     .eq('id', campaignId)
     .single();
   if (campaignError) throw campaignError;
@@ -70,10 +71,22 @@ export async function processCampaignBatch(campaignId: string, limit = 20) {
           : typeof error === 'object' && error && 'message' in error
             ? String((error as any).message)
             : 'Send failed';
+      const failedAt = new Date().toISOString();
       await sb
         .from('campaign_recipients')
         .update({ status: 'Failed', error_message: message })
         .eq('id', row.id);
+
+      await writeBackFlowluWhatsAppStatus({
+        category: row.category,
+        phone: row.phone,
+        status: 'Failed',
+        campaignName: campaign.name || 'WhatsApp Campaign',
+        templateName: campaign.template_name,
+        occurredAt: failedAt,
+        error: message,
+      });
+
       results.push({ id: row.id, name: row.name, phone: row.phone, status: 'Failed', error: message });
     }
   }
