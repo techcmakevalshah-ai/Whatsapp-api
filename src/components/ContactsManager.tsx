@@ -56,13 +56,16 @@ export function ContactsManager({
     if (source !== 'flowlu') return;
 
     const timer = window.setInterval(() => {
-      if (document.visibilityState === 'visible' && !loading && !forceRefreshing) {
-        void onRefresh();
-      }
-    }, 10_000);
+      if (document.visibilityState !== 'visible') return;
+      void getContacts('flowlu')
+        .then((result) => onChanged(result.contacts, result.syncedAt))
+        .catch(() => {
+          // Silent cache polling should never lock or disturb the UI.
+        });
+    }, 15_000);
 
     return () => window.clearInterval(timer);
-  }, [source, onRefresh, loading, forceRefreshing]);
+  }, [source]);
 
   const filtered = useMemo(() => {
     const term = query.trim().toLowerCase();
@@ -109,7 +112,7 @@ export function ContactsManager({
     setForceRefreshing(true);
     setLocalError('');
     try {
-      const result = await getContacts('flowlu', true);
+      const result = await getContacts('flowlu', 'recent', query.trim());
       onChanged(result.contacts, result.syncedAt);
     } catch (err) {
       setLocalError(err instanceof Error ? err.message : 'Unable to refresh Flowlu contacts.');
@@ -140,7 +143,8 @@ export function ContactsManager({
     }
   };
 
-  const refreshing = loading || forceRefreshing;
+  const refreshing = source === 'flowlu' ? forceRefreshing : loading;
+  const switchingSource = loading || forceRefreshing;
 
   return (
     <div className="contacts-page">
@@ -155,8 +159,8 @@ export function ContactsManager({
         </div>
         <div className="contacts-source-actions">
           <div className="contacts-source-toggle">
-            <button type="button" className={source === 'sheet' ? 'active' : ''} onClick={() => onSourceChange('sheet')} disabled={refreshing}>Excel Sheet</button>
-            <button type="button" className={source === 'flowlu' ? 'active' : ''} onClick={() => onSourceChange('flowlu')} disabled={refreshing}>Flowlu CRM</button>
+            <button type="button" className={source === 'sheet' ? 'active' : ''} onClick={() => onSourceChange('sheet')} disabled={switchingSource}>Excel Sheet</button>
+            <button type="button" className={source === 'flowlu' ? 'active' : ''} onClick={() => onSourceChange('flowlu')} disabled={switchingSource}>Flowlu CRM</button>
           </div>
           <button className="btn secondary" onClick={() => void refresh()} disabled={refreshing}>
             <RefreshCw size={16} className={refreshing ? 'spin' : ''}/>
