@@ -19,6 +19,7 @@ import {
   createFlowluContactNote,
   createFlowluFollowupTask,
   createFlowluOpportunity,
+  getFlowluOpportunityAudience,
   getFlowluSalesMeta,
 } from '../server/flowluCrm.js';
 
@@ -151,6 +152,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const meta = await getFlowluSalesMeta();
       res.setHeader('Cache-Control', 'private, max-age=60');
       return res.status(200).json(meta);
+    }
+
+    if (req.method === 'GET' && action === 'flowlu-opportunity-audience') {
+      const pipelineId = Number(req.query.pipelineId || 0);
+      const stageId = Number(req.query.stageId || 0) || undefined;
+      const audience = await getFlowluOpportunityAudience({ pipelineId, stageId });
+      res.setHeader('Cache-Control', 'private, max-age=60');
+      return res.status(200).json(audience);
     }
 
     if (req.method === 'GET' && action === 'flowlu-categories') {
