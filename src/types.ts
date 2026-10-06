@@ -38,6 +38,8 @@ export type FlowluLeadContext = {
   stageId: number | null;
   budget: number;
   assigneeId: number | null;
+  sourceId: number | null;
+  status: 'in_progress' | 'lost' | 'won';
 };
 
 export type FlowluLossReason = {
