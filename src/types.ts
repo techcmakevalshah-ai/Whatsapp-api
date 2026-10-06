@@ -40,6 +40,29 @@ export type FlowluLeadContext = {
   assigneeId: number | null;
 };
 
+export type FlowluLossReason = {
+  id: number;
+  name: string;
+  active: boolean;
+};
+
+export type FlowluOpportunity = {
+  id: number;
+  name: string;
+  active: number;
+  pipelineId: number | null;
+  stageId: number | null;
+  sourceId: number | null;
+  assigneeId: number | null;
+  budget: number;
+  description: string;
+  startDate: string;
+  deadline: string;
+  closingDate: string;
+  closingStatusId: number | null;
+  closingComment: string;
+};
+
 export type WhatsAppTemplate = {
   id: string;
   name: string;
