@@ -1,9 +1,10 @@
-import { Ban, CheckCircle2, Eye, Plus, RefreshCw, Search, UserRound } from 'lucide-react';
+import { Ban, BriefcaseBusiness, CheckCircle2, Eye, Plus, RefreshCw, Search, UserRound } from 'lucide-react';
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { addContact, getContacts, setContactStatus } from '../lib/api';
 import type { Contact, ContactSource } from '../types';
 import { FlowluContactDrawer } from './FlowluContactDrawer';
 import { FlowluCategorySelector } from './FlowluCategorySelector';
+import { FlowluOpportunityCenter } from './FlowluOpportunityCenter';
 import { ReminderCenter } from './ReminderCenter';
 
 export function ContactsManager({
@@ -33,6 +34,7 @@ export function ContactsManager({
   const [changingStatusId, setChangingStatusId] = useState('');
   const [localError, setLocalError] = useState('');
   const [detailContact, setDetailContact] = useState<Contact | null>(null);
+  const [opportunityContact, setOpportunityContact] = useState<Contact | null>(null);
   const [form, setForm] = useState({
     name: '',
     phone: '',
@@ -51,6 +53,8 @@ export function ContactsManager({
     setCategoryFilter('all');
     setStatusFilter('all');
     setLocalError('');
+    setDetailContact(null);
+    setOpportunityContact(null);
     setForm({ name: '', phone: '', category: '', status: 'Active' });
   }, [source]);
 
@@ -269,9 +273,14 @@ export function ContactsManager({
                         {changingStatusId === contact.id ? 'Updating…' : contact.status === 'Active' ? 'Deactivate' : 'Reactivate'}
                       </button>
                     ) : (
-                      <button className="contact-status-button flowlu-view-contact" type="button" onClick={() => setDetailContact(contact)}>
-                        <Eye size={15}/> Details
-                      </button>
+                      <div className="contact-action-stack">
+                        <button className="contact-status-button flowlu-view-contact" type="button" onClick={() => setDetailContact(contact)}>
+                          <Eye size={15}/> Details
+                        </button>
+                        <button className="contact-status-button flowlu-deal-action-button" type="button" onClick={() => setOpportunityContact(contact)}>
+                          <BriefcaseBusiness size={15}/> Deals
+                        </button>
+                      </div>
                     )}
                   </td>
                 </tr>
@@ -290,6 +299,7 @@ export function ContactsManager({
         </div>
       </section>
       <FlowluContactDrawer contact={source === 'flowlu' ? detailContact : null} onClose={() => setDetailContact(null)}/>
+      <FlowluOpportunityCenter contact={source === 'flowlu' ? opportunityContact : null} onClose={() => setOpportunityContact(null)}/>
     </div>
   );
 }
