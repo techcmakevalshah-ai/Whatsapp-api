@@ -7,6 +7,8 @@ export type FlowluOption = {
   pipelineId?: number | null;
 };
 
+export type FlowluDealStatus = 'in_progress' | 'lost' | 'won';
+
 export type FlowluLeadContext = {
   accountId: number;
   leadId: number;
@@ -15,12 +17,28 @@ export type FlowluLeadContext = {
   stageId: number | null;
   budget: number;
   assigneeId: number | null;
+  sourceId: number | null;
+  status: FlowluDealStatus;
 };
 
 function activeFlag(value: unknown) {
   return ![0, '0', false, 'false', 'inactive'].includes(
     typeof value === 'string' ? value.toLowerCase() : value as any,
   );
+}
+
+function dealStatus(value: unknown): FlowluDealStatus {
+  const active = Number(value || 1);
+  if (active === 2) return 'lost';
+  if (active === 3) return 'won';
+  return 'in_progress';
+}
+
+function dealStatusActive(status?: string) {
+  if (status === 'lost') return 2;
+  if (status === 'won') return 3;
+  if (status === 'in_progress') return 1;
+  return undefined;
 }
 
 async function list(path: string, limit = 200) {
@@ -76,24 +94,39 @@ function chunk<T>(items: T[], size: number) {
 }
 
 export async function getFlowluOpportunityAudience(input: {
-  pipelineId: number;
+  pipelineId?: number;
   stageId?: number;
+  assigneeId?: number;
+  sourceId?: number;
+  dealStatus?: 'all' | FlowluDealStatus;
+  minBudget?: number;
+  maxBudget?: number;
 }) {
-  if (!Number.isFinite(input.pipelineId) || input.pipelineId <= 0) {
-    throw new Error('Choose a Flowlu pipeline.');
+  const normalized = {
+    pipelineId: Number(input.pipelineId || 0) || undefined,
+    stageId: Number(input.stageId || 0) || undefined,
+    assigneeId: Number(input.assigneeId || 0) || undefined,
+    sourceId: Number(input.sourceId || 0) || undefined,
+    dealStatus: input.dealStatus && input.dealStatus !== 'all' ? input.dealStatus : undefined,
+    minBudget: Number.isFinite(input.minBudget) ? Math.max(0, Number(input.minBudget)) : undefined,
+    maxBudget: Number.isFinite(input.maxBudget) ? Math.max(0, Number(input.maxBudget)) : undefined,
+  };
+
+  if (normalized.minBudget != null && normalized.maxBudget != null && normalized.minBudget > normalized.maxBudget) {
+    throw new Error('Minimum budget cannot be greater than maximum budget.');
   }
 
   const leads = new Map<number, any>();
   let rowsSeen = 0;
 
   for (let page = 1; page <= 25; page += 1) {
-    const query: Record<string, string | number> = {
-      page,
-      limit: 200,
-      'filter[active]': 1,
-      'filter[pipeline_id]': input.pipelineId,
-    };
-    if (input.stageId) query['filter[pipeline_stage_id]'] = input.stageId;
+    const query: Record<string, string | number> = { page, limit: 200 };
+    if (normalized.pipelineId) query['filter[pipeline_id]'] = normalized.pipelineId;
+    if (normalized.stageId) query['filter[pipeline_stage_id]'] = normalized.stageId;
+    if (normalized.assigneeId) query['filter[assignee_id]'] = normalized.assigneeId;
+    if (normalized.sourceId) query['filter[source_id]'] = normalized.sourceId;
+    const active = dealStatusActive(normalized.dealStatus);
+    if (active) query['filter[active]'] = active;
 
     const data = await flowluGet('crm/lead/list', query);
     const response = data?.response || {};
@@ -102,12 +135,29 @@ export async function getFlowluOpportunityAudience(input: {
 
     for (const row of items) {
       const id = Number(row?.id || 0);
-      if (id > 0) leads.set(id, row);
+      if (!id) continue;
+
+      const pipelineId = Number(row?.pipeline_id || 0) || undefined;
+      const stageId = Number(row?.pipeline_stage_id || 0) || undefined;
+      const assigneeId = Number(row?.assignee_id || 0) || undefined;
+      const sourceId = Number(row?.source_id || 0) || undefined;
+      const status = dealStatus(row?.active);
+      const budget = Number(row?.budget || 0);
+
+      if (normalized.pipelineId && pipelineId !== normalized.pipelineId) continue;
+      if (normalized.stageId && stageId !== normalized.stageId) continue;
+      if (normalized.assigneeId && assigneeId !== normalized.assigneeId) continue;
+      if (normalized.sourceId && sourceId !== normalized.sourceId) continue;
+      if (normalized.dealStatus && status !== normalized.dealStatus) continue;
+      if (normalized.minBudget != null && budget < normalized.minBudget) continue;
+      if (normalized.maxBudget != null && budget > normalized.maxBudget) continue;
+
+      leads.set(id, row);
     }
 
     rowsSeen += items.length;
     const total = Number(response?.total || 0);
-    if ((total > 0 && rowsSeen >= total) || items.length < Number(response?.count || 200)) break;
+    if ((total > 0 && rowsSeen >= total) || items.length < 200) break;
   }
 
   const leadIds = [...leads.keys()];
@@ -145,6 +195,8 @@ export async function getFlowluOpportunityAudience(input: {
           stageId: Number(lead?.pipeline_stage_id || 0) || null,
           budget: Number(lead?.budget || 0),
           assigneeId: Number(lead?.assignee_id || 0) || null,
+          sourceId: Number(lead?.source_id || 0) || null,
+          status: dealStatus(lead?.active),
         };
 
         const existing = contexts.get(accountId);

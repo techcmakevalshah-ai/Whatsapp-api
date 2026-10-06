@@ -1,4 +1,4 @@
-import { Filter, Search } from 'lucide-react';
+import { Filter, Search, SlidersHorizontal } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { getFlowluSalesMeta } from '../lib/api';
 import { getFlowluOpportunityAudience } from '../lib/flowluAudience';
@@ -6,6 +6,8 @@ import type { Contact, ContactSource, FlowluLeadContext, FlowluSalesMeta } from 
 import './ContactsTable.flowlu.css';
 
 type FilterMode = 'all' | 'active' | 'inactive';
+type OpportunityPresence = 'all' | 'has' | 'none';
+type DealStatusFilter = 'all' | 'in_progress' | 'won' | 'lost';
 
 export function ContactsTable({ contacts, source, selected, onToggle, onToggleAll, query, setQuery }: {
   contacts: Contact[];
@@ -21,6 +23,12 @@ export function ContactsTable({ contacts, source, selected, onToggle, onToggleAl
   const [flowluMeta, setFlowluMeta] = useState<FlowluSalesMeta | null>(null);
   const [pipelineFilter, setPipelineFilter] = useState('');
   const [stageFilter, setStageFilter] = useState('');
+  const [assigneeFilter, setAssigneeFilter] = useState('');
+  const [sourceFilter, setSourceFilter] = useState('');
+  const [dealStatusFilter, setDealStatusFilter] = useState<DealStatusFilter>('all');
+  const [opportunityPresence, setOpportunityPresence] = useState<OpportunityPresence>('all');
+  const [minBudget, setMinBudget] = useState('');
+  const [maxBudget, setMaxBudget] = useState('');
   const [audienceIds, setAudienceIds] = useState<Set<number> | null>(null);
   const [leadContexts, setLeadContexts] = useState<Map<number, FlowluLeadContext>>(new Map());
   const [audienceLoading, setAudienceLoading] = useState(false);
@@ -37,6 +45,12 @@ export function ContactsTable({ contacts, source, selected, onToggle, onToggleAl
       setFlowluMeta(null);
       setPipelineFilter('');
       setStageFilter('');
+      setAssigneeFilter('');
+      setSourceFilter('');
+      setDealStatusFilter('all');
+      setOpportunityPresence('all');
+      setMinBudget('');
+      setMaxBudget('');
       setAudienceIds(null);
       setLeadContexts(new Map());
       setAudienceError('');
@@ -49,17 +63,39 @@ export function ContactsTable({ contacts, source, selected, onToggle, onToggleAl
         if (active) setFlowluMeta(data);
       })
       .catch((err) => {
-        if (active) setAudienceError(err instanceof Error ? err.message : 'Unable to load Flowlu pipelines.');
+        if (active) setAudienceError(err instanceof Error ? err.message : 'Unable to load Flowlu sales filters.');
       });
 
     return () => { active = false; };
   }, [source]);
 
+  const hasDealFilter = source === 'flowlu' && Boolean(
+    pipelineFilter
+    || stageFilter
+    || assigneeFilter
+    || sourceFilter
+    || dealStatusFilter !== 'all'
+    || minBudget.trim()
+    || maxBudget.trim()
+    || opportunityPresence !== 'all'
+  );
+
   useEffect(() => {
-    if (source !== 'flowlu' || !pipelineFilter) {
+    if (source !== 'flowlu' || !hasDealFilter) {
       setAudienceIds(null);
       setLeadContexts(new Map());
       setAudienceError('');
+      return;
+    }
+
+    const min = minBudget.trim() === '' ? undefined : Number(minBudget);
+    const max = maxBudget.trim() === '' ? undefined : Number(maxBudget);
+    if ((min !== undefined && !Number.isFinite(min)) || (max !== undefined && !Number.isFinite(max))) {
+      setAudienceError('Enter a valid budget amount.');
+      return;
+    }
+    if (min !== undefined && max !== undefined && min > max) {
+      setAudienceError('Minimum budget cannot be greater than maximum budget.');
       return;
     }
 
@@ -67,10 +103,15 @@ export function ContactsTable({ contacts, source, selected, onToggle, onToggleAl
     setAudienceLoading(true);
     setAudienceError('');
 
-    void getFlowluOpportunityAudience(
-      Number(pipelineFilter),
-      stageFilter ? Number(stageFilter) : undefined,
-    )
+    void getFlowluOpportunityAudience({
+      pipelineId: opportunityPresence === 'none' ? undefined : (pipelineFilter ? Number(pipelineFilter) : undefined),
+      stageId: opportunityPresence === 'none' ? undefined : (stageFilter ? Number(stageFilter) : undefined),
+      assigneeId: opportunityPresence === 'none' ? undefined : (assigneeFilter ? Number(assigneeFilter) : undefined),
+      sourceId: opportunityPresence === 'none' ? undefined : (sourceFilter ? Number(sourceFilter) : undefined),
+      dealStatus: opportunityPresence === 'none' ? 'all' : dealStatusFilter,
+      minBudget: opportunityPresence === 'none' ? undefined : min,
+      maxBudget: opportunityPresence === 'none' ? undefined : max,
+    })
       .then((data) => {
         if (!active) return;
         setAudienceIds(new Set(data.accountIds));
@@ -87,7 +128,18 @@ export function ContactsTable({ contacts, source, selected, onToggle, onToggleAl
       });
 
     return () => { active = false; };
-  }, [source, pipelineFilter, stageFilter]);
+  }, [
+    source,
+    hasDealFilter,
+    pipelineFilter,
+    stageFilter,
+    assigneeFilter,
+    sourceFilter,
+    dealStatusFilter,
+    opportunityPresence,
+    minBudget,
+    maxBudget,
+  ]);
 
   const availableStages = useMemo(
     () => (flowluMeta?.stages || []).filter(
@@ -100,6 +152,17 @@ export function ContactsTable({ contacts, source, selected, onToggle, onToggleAl
     () => new Map((flowluMeta?.stages || []).map((stage) => [stage.id, stage.name])),
     [flowluMeta],
   );
+
+  const sourceNames = useMemo(
+    () => new Map((flowluMeta?.sources || []).map((item) => [item.id, item.name])),
+    [flowluMeta],
+  );
+
+  const statusLabel = (status: FlowluLeadContext['status']) => {
+    if (status === 'won') return 'Won';
+    if (status === 'lost') return 'Lost';
+    return 'In Progress';
+  };
 
   const filtered = useMemo(() => contacts.filter((contact) => {
     const matchesQuery = `${contact.name} ${contact.phone} ${contact.category}`
@@ -115,27 +178,52 @@ export function ContactsTable({ contacts, source, selected, onToggle, onToggleAl
       ? true
       : categoryFilter === 'all' || contact.category === categoryFilter;
 
-    const matchesOpportunity = source !== 'flowlu'
-      || audienceIds === null
-      || (contact.flowluId != null && audienceIds.has(contact.flowluId));
+    let matchesOpportunity = true;
+    if (source === 'flowlu' && audienceIds !== null) {
+      const linked = contact.flowluId != null && audienceIds.has(contact.flowluId);
+      matchesOpportunity = opportunityPresence === 'none' ? !linked : linked;
+    }
 
     return matchesQuery && matchesStatus && matchesCategory && matchesOpportunity;
-  }), [contacts, query, statusFilter, categoryFilter, source, audienceIds]);
+  }), [contacts, query, statusFilter, categoryFilter, source, audienceIds, opportunityPresence]);
 
   const activeVisible = filtered.filter((contact) => contact.status === 'Active');
   const allVisibleSelected =
     activeVisible.length > 0 &&
     activeVisible.every((contact) => selected.has(contact.id));
 
+  const clearDealFilters = () => {
+    setPipelineFilter('');
+    setStageFilter('');
+    setAssigneeFilter('');
+    setSourceFilter('');
+    setDealStatusFilter('all');
+    setOpportunityPresence('all');
+    setMinBudget('');
+    setMaxBudget('');
+    setAudienceIds(null);
+    setLeadContexts(new Map());
+    setAudienceError('');
+  };
+
   const clearFilters = () => {
     setQuery('');
     setStatusFilter('all');
     setCategoryFilter('all');
-    setPipelineFilter('');
-    setStageFilter('');
-    setAudienceIds(null);
-    setLeadContexts(new Map());
-    setAudienceError('');
+    clearDealFilters();
+  };
+
+  const setPresence = (value: OpportunityPresence) => {
+    setOpportunityPresence(value);
+    if (value === 'none') {
+      setPipelineFilter('');
+      setStageFilter('');
+      setAssigneeFilter('');
+      setSourceFilter('');
+      setDealStatusFilter('all');
+      setMinBudget('');
+      setMaxBudget('');
+    }
   };
 
   return (
@@ -152,36 +240,7 @@ export function ContactsTable({ contacts, source, selected, onToggle, onToggleAl
           />
         </div>
 
-        {source === 'flowlu' ? (
-          <>
-            <select
-              className="filter-select"
-              value={pipelineFilter}
-              onChange={(e) => {
-                setPipelineFilter(e.target.value);
-                setStageFilter('');
-              }}
-              disabled={!flowluMeta || audienceLoading}
-            >
-              <option value="">All pipelines</option>
-              {(flowluMeta?.pipelines || []).map((pipeline) => (
-                <option key={pipeline.id} value={pipeline.id}>{pipeline.name}</option>
-              ))}
-            </select>
-
-            <select
-              className="filter-select"
-              value={stageFilter}
-              onChange={(e) => setStageFilter(e.target.value)}
-              disabled={!pipelineFilter || audienceLoading}
-            >
-              <option value="">All stages</option>
-              {availableStages.map((stage) => (
-                <option key={stage.id} value={stage.id}>{stage.name}</option>
-              ))}
-            </select>
-          </>
-        ) : (
+        {source !== 'flowlu' && (
           <select
             className="filter-select"
             value={categoryFilter}
@@ -199,7 +258,7 @@ export function ContactsTable({ contacts, source, selected, onToggle, onToggleAl
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value as FilterMode)}
         >
-          <option value="all">All status</option>
+          <option value="all">All contact status</option>
           <option value="active">Active only</option>
           <option value="inactive">Inactive</option>
         </select>
@@ -209,13 +268,107 @@ export function ContactsTable({ contacts, source, selected, onToggle, onToggleAl
         </button>
       </div>
 
-      {source === 'flowlu' && (pipelineFilter || audienceLoading || audienceError) && (
+      {source === 'flowlu' && (
+        <div className="flowlu-smart-builder">
+          <div className="flowlu-smart-head">
+            <div>
+              <span className="flowlu-smart-icon"><SlidersHorizontal size={15}/></span>
+              <span><b>Smart Audience</b><small>Filter the selected Flowlu segment using live opportunity data.</small></span>
+            </div>
+            {hasDealFilter && <button type="button" onClick={clearDealFilters}>Reset deal filters</button>}
+          </div>
+
+          <div className="flowlu-smart-grid">
+            <label>
+              <span>Opportunity</span>
+              <select value={opportunityPresence} onChange={(e) => setPresence(e.target.value as OpportunityPresence)} disabled={audienceLoading}>
+                <option value="all">All contacts</option>
+                <option value="has">Has opportunity</option>
+                <option value="none">No opportunity</option>
+              </select>
+            </label>
+
+            <label>
+              <span>Pipeline</span>
+              <select
+                value={pipelineFilter}
+                onChange={(e) => {
+                  setPipelineFilter(e.target.value);
+                  setStageFilter('');
+                }}
+                disabled={!flowluMeta || audienceLoading || opportunityPresence === 'none'}
+              >
+                <option value="">All pipelines</option>
+                {(flowluMeta?.pipelines || []).map((pipeline) => (
+                  <option key={pipeline.id} value={pipeline.id}>{pipeline.name}</option>
+                ))}
+              </select>
+            </label>
+
+            <label>
+              <span>Stage</span>
+              <select
+                value={stageFilter}
+                onChange={(e) => setStageFilter(e.target.value)}
+                disabled={!pipelineFilter || audienceLoading || opportunityPresence === 'none'}
+              >
+                <option value="">All stages</option>
+                {availableStages.map((stage) => (
+                  <option key={stage.id} value={stage.id}>{stage.name}</option>
+                ))}
+              </select>
+            </label>
+
+            <label>
+              <span>Assignee</span>
+              <select value={assigneeFilter} onChange={(e) => setAssigneeFilter(e.target.value)} disabled={!flowluMeta || audienceLoading || opportunityPresence === 'none'}>
+                <option value="">All assignees</option>
+                {(flowluMeta?.users || []).map((user) => <option key={user.id} value={user.id}>{user.name}</option>)}
+              </select>
+            </label>
+
+            <label>
+              <span>Lead Source</span>
+              <select value={sourceFilter} onChange={(e) => setSourceFilter(e.target.value)} disabled={!flowluMeta || audienceLoading || opportunityPresence === 'none'}>
+                <option value="">All sources</option>
+                {(flowluMeta?.sources || []).map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+              </select>
+            </label>
+
+            <label>
+              <span>Deal Status</span>
+              <select value={dealStatusFilter} onChange={(e) => setDealStatusFilter(e.target.value as DealStatusFilter)} disabled={audienceLoading || opportunityPresence === 'none'}>
+                <option value="all">All deal status</option>
+                <option value="in_progress">In Progress</option>
+                <option value="won">Won</option>
+                <option value="lost">Lost</option>
+              </select>
+            </label>
+
+            <label>
+              <span>Min Budget</span>
+              <input type="number" min="0" inputMode="numeric" placeholder="e.g. 1000000" value={minBudget} onChange={(e) => setMinBudget(e.target.value)} disabled={audienceLoading || opportunityPresence === 'none'}/>
+            </label>
+
+            <label>
+              <span>Max Budget</span>
+              <input type="number" min="0" inputMode="numeric" placeholder="e.g. 5000000" value={maxBudget} onChange={(e) => setMaxBudget(e.target.value)} disabled={audienceLoading || opportunityPresence === 'none'}/>
+            </label>
+          </div>
+
+          {opportunityPresence === 'none' && (
+            <div className="flowlu-smart-help">No Opportunity checks the selected segment against all Flowlu opportunities, so the other deal filters are disabled.</div>
+          )}
+        </div>
+      )}
+
+      {source === 'flowlu' && (hasDealFilter || audienceLoading || audienceError) && (
         <div className={`flowlu-audience-status ${audienceError ? 'error' : ''}`}>
           {audienceLoading
-            ? 'Loading contacts linked to this Flowlu pipeline/stage…'
+            ? 'Checking Flowlu opportunities for this audience…'
             : audienceError
               ? audienceError
-              : `${filtered.length} loaded segment contact${filtered.length === 1 ? '' : 's'} match this opportunity filter.`}
+              : <><b>{filtered.length}</b> matching contact{filtered.length === 1 ? '' : 's'} in this loaded segment. Select All will select only these active matches.</>}
         </div>
       )}
 
@@ -260,6 +413,7 @@ export function ContactsTable({ contacts, source, selected, onToggle, onToggleAl
                         <span className="flowlu-lead-context">
                           <b>{context.leadName}</b>
                           <small>{context.stageId ? stageNames.get(context.stageId) || 'Flowlu stage' : 'Pipeline opportunity'}</small>
+                          <small>{statusLabel(context.status)}{context.sourceId ? ` · ${sourceNames.get(context.sourceId) || 'Source'}` : ''}{context.budget > 0 ? ` · ₹${context.budget.toLocaleString('en-IN')}` : ''}</small>
                         </span>
                       ) : (
                         <span className="muted-text">—</span>
@@ -278,7 +432,7 @@ export function ContactsTable({ contacts, source, selected, onToggle, onToggleAl
               <tr>
                 <td colSpan={source === 'flowlu' ? 6 : 5}>
                   <div className="contacts-empty">
-                    {audienceLoading ? 'Loading Flowlu opportunity contacts…' : 'No contacts match these filters.'}
+                    {audienceLoading ? 'Checking Flowlu audience…' : 'No contacts match these filters.'}
                   </div>
                 </td>
               </tr>

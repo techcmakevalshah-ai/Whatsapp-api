@@ -15,13 +15,29 @@ async function authenticatedJson<T>(url: string): Promise<T> {
   return body as T;
 }
 
-export function getFlowluOpportunityAudience(pipelineId: number, stageId?: number) {
+export type FlowluAudienceFilters = {
+  pipelineId?: number;
+  stageId?: number;
+  assigneeId?: number;
+  sourceId?: number;
+  dealStatus?: 'all' | 'in_progress' | 'won' | 'lost';
+  minBudget?: number;
+  maxBudget?: number;
+};
+
+export function getFlowluOpportunityAudience(filters: FlowluAudienceFilters) {
   const params = new URLSearchParams({
     action: 'flowlu-opportunity-audience',
     source: 'flowlu',
-    pipelineId: String(pipelineId),
   });
-  if (stageId) params.set('stageId', String(stageId));
+
+  if (filters.pipelineId) params.set('pipelineId', String(filters.pipelineId));
+  if (filters.stageId) params.set('stageId', String(filters.stageId));
+  if (filters.assigneeId) params.set('assigneeId', String(filters.assigneeId));
+  if (filters.sourceId) params.set('sourceId', String(filters.sourceId));
+  if (filters.dealStatus && filters.dealStatus !== 'all') params.set('dealStatus', filters.dealStatus);
+  if (Number.isFinite(filters.minBudget)) params.set('minBudget', String(filters.minBudget));
+  if (Number.isFinite(filters.maxBudget)) params.set('maxBudget', String(filters.maxBudget));
 
   return authenticatedJson<{
     accountIds: number[];
