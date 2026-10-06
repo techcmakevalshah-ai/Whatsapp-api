@@ -23,6 +23,10 @@ import {
   getFlowluOpportunityAudience,
   getFlowluSalesMeta,
 } from '../server/flowluCrm.js';
+import {
+  fetchFlowluOpportunitiesForContact,
+  updateFlowluOpportunity,
+} from '../server/flowluOpportunityControl.js';
 
 function extractFlowluWebhookId(body: any) {
   const candidates = [
@@ -165,6 +169,34 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const audience = await getFlowluOpportunityAudience({ pipelineId, stageId });
       res.setHeader('Cache-Control', 'private, max-age=60');
       return res.status(200).json(audience);
+    }
+
+    if (req.method === 'GET' && action === 'flowlu-opportunities') {
+      const accountId = Number(req.query.accountId || 0);
+      const result = await fetchFlowluOpportunitiesForContact(accountId);
+      res.setHeader('Cache-Control', 'no-store');
+      return res.status(200).json(result);
+    }
+
+    if (req.method === 'PATCH' && action === 'flowlu-opportunity-update') {
+      const body = req.body || {};
+      const opportunity = await updateFlowluOpportunity({
+        id: Number(body.id || 0),
+        name: body.name === undefined ? undefined : String(body.name),
+        budget: body.budget === undefined || body.budget === '' ? undefined : Number(body.budget),
+        pipelineId: body.pipelineId === undefined || body.pipelineId === '' ? undefined : Number(body.pipelineId),
+        stageId: body.stageId === undefined || body.stageId === '' ? undefined : Number(body.stageId),
+        sourceId: body.sourceId === undefined ? undefined : Number(body.sourceId || 0),
+        assigneeId: body.assigneeId === undefined ? undefined : Number(body.assigneeId || 0),
+        description: body.description === undefined ? undefined : String(body.description),
+        deadline: body.deadline === undefined ? undefined : String(body.deadline),
+        action: ['won', 'lost', 'reopen'].includes(String(body.opportunityAction || ''))
+          ? String(body.opportunityAction) as 'won' | 'lost' | 'reopen'
+          : 'save',
+        lossReasonId: body.lossReasonId ? Number(body.lossReasonId) : undefined,
+        closingComment: body.closingComment === undefined ? undefined : String(body.closingComment),
+      });
+      return res.status(200).json({ ok: true, opportunity });
     }
 
     if (req.method === 'GET' && action === 'flowlu-categories') {
