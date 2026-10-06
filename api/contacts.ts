@@ -164,9 +164,35 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     if (req.method === 'GET' && action === 'flowlu-opportunity-audience') {
-      const pipelineId = Number(req.query.pipelineId || 0);
+      const pipelineId = Number(req.query.pipelineId || 0) || undefined;
       const stageId = Number(req.query.stageId || 0) || undefined;
-      const audience = await getFlowluOpportunityAudience({ pipelineId, stageId });
+      const assigneeId = Number(req.query.assigneeId || 0) || undefined;
+      const sourceId = Number(req.query.sourceId || 0) || undefined;
+      const dealStatusRaw = String(req.query.dealStatus || 'all');
+      const dealStatus = ['in_progress', 'won', 'lost'].includes(dealStatusRaw)
+        ? dealStatusRaw as 'in_progress' | 'won' | 'lost'
+        : 'all';
+      const minBudgetRaw = String(req.query.minBudget || '').trim();
+      const maxBudgetRaw = String(req.query.maxBudget || '').trim();
+      const minBudget = minBudgetRaw === '' ? undefined : Number(minBudgetRaw);
+      const maxBudget = maxBudgetRaw === '' ? undefined : Number(maxBudgetRaw);
+
+      if (minBudget !== undefined && (!Number.isFinite(minBudget) || minBudget < 0)) {
+        return res.status(400).json({ error: 'Enter a valid minimum budget.' });
+      }
+      if (maxBudget !== undefined && (!Number.isFinite(maxBudget) || maxBudget < 0)) {
+        return res.status(400).json({ error: 'Enter a valid maximum budget.' });
+      }
+
+      const audience = await getFlowluOpportunityAudience({
+        pipelineId,
+        stageId,
+        assigneeId,
+        sourceId,
+        dealStatus,
+        minBudget,
+        maxBudget,
+      });
       res.setHeader('Cache-Control', 'private, max-age=60');
       return res.status(200).json(audience);
     }
