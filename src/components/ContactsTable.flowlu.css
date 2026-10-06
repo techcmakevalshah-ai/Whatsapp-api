@@ -1,11 +1,11 @@
 .flowlu-audience-status{
   margin:10px 0 12px;
-  padding:9px 11px;
+  padding:10px 12px;
   border:1px solid #d8e4f2;
-  border-radius:9px;
+  border-radius:10px;
   background:#f7fbff;
   color:#4d627b;
-  font-size:10px;
+  font-size:11px;
   font-weight:700;
 }
 .flowlu-audience-status.error{
@@ -13,11 +13,108 @@
   background:#fff7f7;
   color:#a43a3a;
 }
+.flowlu-smart-builder{
+  margin:12px 0 4px;
+  border:1px solid #dfe8f2;
+  border-radius:14px;
+  background:#fbfdff;
+  padding:14px;
+}
+.flowlu-smart-head{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  margin-bottom:12px;
+}
+.flowlu-smart-head>div{
+  display:flex;
+  align-items:center;
+  gap:9px;
+}
+.flowlu-smart-head span span{
+  display:flex;
+  flex-direction:column;
+  gap:2px;
+}
+.flowlu-smart-head b{
+  color:#223954;
+  font-size:12px;
+}
+.flowlu-smart-head small{
+  color:#78899c;
+  font-size:10px;
+  font-weight:600;
+}
+.flowlu-smart-head button{
+  border:0;
+  background:transparent;
+  color:#5d7390;
+  font-size:10px;
+  font-weight:800;
+  cursor:pointer;
+}
+.flowlu-smart-icon{
+  width:30px;
+  height:30px;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  border-radius:9px;
+  background:#edf5ff;
+  color:#2f6fb4;
+}
+.flowlu-smart-grid{
+  display:grid;
+  grid-template-columns:repeat(4,minmax(0,1fr));
+  gap:10px;
+}
+.flowlu-smart-grid label{
+  display:flex;
+  flex-direction:column;
+  gap:5px;
+}
+.flowlu-smart-grid label>span{
+  color:#60758e;
+  font-size:9px;
+  font-weight:800;
+  text-transform:uppercase;
+  letter-spacing:.04em;
+}
+.flowlu-smart-grid select,
+.flowlu-smart-grid input{
+  width:100%;
+  min-height:36px;
+  border:1px solid #d7e0ea;
+  border-radius:9px;
+  background:#fff;
+  color:#263d58;
+  padding:7px 9px;
+  font-size:11px;
+  outline:none;
+}
+.flowlu-smart-grid select:focus,
+.flowlu-smart-grid input:focus{
+  border-color:#8bb7e9;
+  box-shadow:0 0 0 2px rgba(63,126,197,.08);
+}
+.flowlu-smart-grid select:disabled,
+.flowlu-smart-grid input:disabled{
+  background:#f3f6f9;
+  color:#a1adba;
+  cursor:not-allowed;
+}
+.flowlu-smart-help{
+  margin-top:9px;
+  color:#75869a;
+  font-size:10px;
+  font-weight:600;
+}
 .flowlu-lead-context{
   display:flex;
   flex-direction:column;
   gap:2px;
-  min-width:120px;
+  min-width:145px;
 }
 .flowlu-lead-context b{
   color:#223954;
@@ -29,6 +126,11 @@
   font-size:9px;
 }
 .muted-text{color:#98a4b3}
+@media(max-width:1050px){
+  .flowlu-smart-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
 @media(max-width:700px){
   .flowlu-lead-context{min-width:100px}
+  .flowlu-smart-head{align-items:flex-start;flex-direction:column}
+  .flowlu-smart-grid{grid-template-columns:1fr}
 }
