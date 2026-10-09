@@ -1,6 +1,12 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": "vite",
+  "crons": [
+    {
+      "path": "/api/keepalive",
+      "schedule": "30 3 * * *"
+    }
+  ],
   "redirects": [
     {
       "source": "/:path*",
@@ -51,6 +57,7 @@
     }
   ],
   "rewrites": [
+    { "source": "/api/keepalive", "destination": "/api/campaigns?keepalive=1" },
     { "source": "/((?!api/).*)", "destination": "/index.html" }
   ]
 }
