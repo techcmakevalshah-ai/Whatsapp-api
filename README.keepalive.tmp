@@ -1,0 +1,1 @@
+Daily Supabase keepalive is configured through the existing campaigns Vercel Function and Vercel Cron. This temporary marker is not needed in production.
