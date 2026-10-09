@@ -11,7 +11,36 @@ function validTimezone(value: string) {
   }
 }
 
+function isAuthorizedCron(req: VercelRequest) {
+  const secret = String(process.env.CRON_SECRET || '').trim();
+  const authorization = String(req.headers.authorization || '').trim();
+  return Boolean(secret) && authorization === `Bearer ${secret}`;
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  if (req.method === 'GET' && String(req.query.keepalive || '') === '1') {
+    if (!isAuthorizedCron(req)) {
+      return res.status(401).json({ error: 'Unauthorized cron request.' });
+    }
+
+    try {
+      const sb = supabaseAdmin();
+      const { error } = await sb.from('campaigns').select('id').limit(1);
+      if (error) throw error;
+
+      res.setHeader('Cache-Control', 'no-store');
+      return res.status(200).json({
+        ok: true,
+        service: 'supabase-keepalive',
+        checkedAt: new Date().toISOString(),
+      });
+    } catch (error) {
+      return res.status(500).json({
+        error: error instanceof Error ? error.message : 'Supabase keepalive failed.',
+      });
+    }
+  }
+
   const user = await requireStaff(req, res);
   if (!user) return;
 
