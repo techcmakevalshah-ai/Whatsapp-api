@@ -63,9 +63,9 @@ function isPastDeadline(value: string, status: FlowluTaskStatus) {
   return !Number.isNaN(date.getTime()) && date.getTime() < Date.now();
 }
 
-async function fetchUsers() {
+async function fetchUsers(): Promise<FlowluTaskUser[]> {
   const data = await flowluGet('core/user/list', { page: 1, limit: 200 });
-  const items = Array.isArray(data?.response?.items) ? data.response.items : [];
+  const items: any[] = Array.isArray(data?.response?.items) ? data.response.items : [];
   return items
     .map((row: any): FlowluTaskUser => ({
       id: Number(row?.id || 0),
@@ -79,7 +79,7 @@ async function fetchUsers() {
         `User #${Number(row?.id || 0)}`,
       active: activeFlag(row?.active ?? row?.is_active ?? 1),
     }))
-    .filter((row: FlowluTaskUser) => row.id > 0 && row.name);
+    .filter((row: FlowluTaskUser) => row.id > 0 && Boolean(row.name));
 }
 
 function mapTask(row: any, users: Map<number, string>): FlowluTaskRecord | null {
@@ -108,8 +108,6 @@ function mapTask(row: any, users: Map<number, string>): FlowluTaskRecord | null 
     created: flowluDate(row?.created),
     changed: flowluDate(row?.changed),
     closedDate: flowluDate(row?.closed_date),
-    // Flowlu exposes both values as integer task fields. Existing Flowlu installations use these
-    // values as elapsed seconds; keep the raw values so the UI can display them consistently.
     timeEstimate: Math.max(0, Number(row?.time_estimate || 0)),
     timeSpent: Math.max(0, Number(row?.time_spent || 0)),
     progress: Number(row?.progress || 0),
@@ -128,8 +126,8 @@ export async function fetchFlowluTasks(input: {
   includeCompleted?: boolean;
   maxPages?: number;
 } = {}) {
-  const users = await fetchUsers();
-  const userMap = new Map(users.map((user) => [user.id, user.name]));
+  const users: FlowluTaskUser[] = await fetchUsers();
+  const userMap = new Map<number, string>(users.map((user: FlowluTaskUser) => [user.id, user.name]));
   const tasks: FlowluTaskRecord[] = [];
   const maxPages = Math.min(15, Math.max(1, Number(input.maxPages || 8)));
   let seen = 0;
@@ -147,7 +145,7 @@ export async function fetchFlowluTasks(input: {
 
     const data = await flowluGet('task/task/list', query);
     const response = data?.response || {};
-    const rows = Array.isArray(response?.items) ? response.items : [];
+    const rows: any[] = Array.isArray(response?.items) ? response.items : [];
     if (!rows.length) break;
 
     for (const row of rows) {
@@ -175,7 +173,7 @@ export async function fetchFlowluTasks(input: {
     return b.id - a.id;
   });
 
-  return { tasks, users: users.filter((user) => user.active) };
+  return { tasks, users: users.filter((user: FlowluTaskUser) => user.active) };
 }
 
 export async function fetchFlowluTaskById(id: number) {
@@ -184,7 +182,8 @@ export async function fetchFlowluTaskById(id: number) {
     flowluGet(`task/task/get/${id}`),
     fetchUsers(),
   ]);
-  const task = mapTask(data?.response || {}, new Map(users.map((user) => [user.id, user.name])));
+  const userMap = new Map<number, string>(users.map((user: FlowluTaskUser) => [user.id, user.name]));
+  const task = mapTask(data?.response || {}, userMap);
   if (!task) throw new Error('Flowlu task was not found.');
   return task;
 }
@@ -261,9 +260,6 @@ export async function updateFlowluTask(input: {
       const parsed = new Date(deadline);
       if (Number.isNaN(parsed.getTime())) throw new Error('Enter a valid task deadline.');
       body.deadline = parsed.toISOString().slice(0, 19).replace('T', ' ');
-    } else {
-      // Flowlu accepts an empty deadline when editing through the UI, but our form helper
-      // omits empty values. Leave it unchanged rather than sending an invalid value.
     }
   }
 
