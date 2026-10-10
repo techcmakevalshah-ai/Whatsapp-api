@@ -1,6 +1,18 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { requireStaff } from '../server/auth.js';
 import { supabaseAdmin } from '../server/supabaseAdmin.js';
+import {
+  createFlowluTask,
+  fetchFlowluTasks,
+  updateFlowluTask,
+  type FlowluTaskStatus,
+} from '../server/flowluTasks.js';
+import {
+  endTaskTimer,
+  getTaskTimerSnapshot,
+  listTaskTimerHistory,
+  startTaskTimer,
+} from '../server/flowluTaskTimers.js';
 
 function validTimezone(value: string) {
   try {
@@ -15,6 +27,10 @@ function isAuthorizedCron(req: VercelRequest) {
   const secret = String(process.env.CRON_SECRET || '').trim();
   const authorization = String(req.headers.authorization || '').trim();
   return Boolean(secret) && authorization === `Bearer ${secret}`;
+}
+
+function flowluTaskAction(req: VercelRequest) {
+  return String(req.query.action || req.body?.action || '').trim().toLowerCase();
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -45,8 +61,96 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (!user) return;
 
   const sb = supabaseAdmin();
+  const taskAction = flowluTaskAction(req);
 
   try {
+    if (req.method === 'GET' && taskAction === 'flowlu-tasks') {
+      const statusRaw = Number(req.query.status || 0);
+      const responsibleId = Number(req.query.responsibleId || 0) || undefined;
+      const result = await fetchFlowluTasks({
+        search: String(req.query.search || '').trim() || undefined,
+        responsibleId,
+        status: [1, 3, 4, 5].includes(statusRaw) ? statusRaw : undefined,
+        includeCompleted: String(req.query.includeCompleted || '1') !== '0',
+      });
+      const timer = await getTaskTimerSnapshot(user, result.tasks.map((task) => task.id));
+      res.setHeader('Cache-Control', 'no-store');
+      return res.status(200).json({
+        ...result,
+        ...timer,
+        syncedAt: new Date().toISOString(),
+      });
+    }
+
+    if (req.method === 'GET' && taskAction === 'flowlu-task-timer-history') {
+      const taskId = Number(req.query.taskId || 0) || undefined;
+      const sessions = await listTaskTimerHistory(user, taskId, Number(req.query.limit || 500));
+      res.setHeader('Cache-Control', 'no-store');
+      return res.status(200).json({ sessions });
+    }
+
+    if (req.method === 'POST' && taskAction === 'flowlu-task-board-create') {
+      const body = req.body || {};
+      const result = await createFlowluTask({
+        name: String(body.name || ''),
+        responsibleId: Number(body.responsibleId || 0),
+        createdBy: Number(body.flowluCreatedBy || body.responsibleId || 0),
+        deadline: body.deadline ? String(body.deadline) : undefined,
+        description: body.description ? String(body.description) : undefined,
+        priority: Number(body.priority || 2),
+        timeEstimate: Math.max(0, Number(body.timeEstimateSeconds || 0)),
+        crmCompanyId: Number(body.crmCompanyId || 0) || undefined,
+      });
+      return res.status(201).json({ ok: true, taskId: result.id });
+    }
+
+    if (req.method === 'PATCH' && taskAction === 'flowlu-task-board-update') {
+      const body = req.body || {};
+      const statusRaw = body.status === undefined ? undefined : Number(body.status);
+      if (statusRaw !== undefined && ![1, 3, 4, 5].includes(statusRaw)) {
+        return res.status(400).json({ error: 'Choose a valid Flowlu task status.' });
+      }
+
+      const result = await updateFlowluTask({
+        id: Number(body.id || 0),
+        name: body.name === undefined ? undefined : String(body.name),
+        responsibleId: body.responsibleId === undefined ? undefined : Number(body.responsibleId || 0),
+        deadline: body.deadline === undefined ? undefined : String(body.deadline || ''),
+        description: body.description === undefined ? undefined : String(body.description || ''),
+        priority: body.priority === undefined ? undefined : Number(body.priority),
+        timeEstimate: body.timeEstimateSeconds === undefined
+          ? undefined
+          : Math.max(0, Number(body.timeEstimateSeconds || 0)),
+        status: statusRaw as FlowluTaskStatus | undefined,
+      });
+      return res.status(200).json({ ok: true, task: result });
+    }
+
+    if (req.method === 'POST' && taskAction === 'flowlu-task-timer') {
+      const body = req.body || {};
+      const timerAction = String(body.timerAction || '').trim().toLowerCase();
+      const taskId = Number(body.taskId || 0);
+
+      if (timerAction === 'start') {
+        const result = await startTaskTimer(user, {
+          taskId,
+          taskName: String(body.taskName || ''),
+        });
+        return res.status(200).json({ ok: true, ...result });
+      }
+
+      if (['pause', 'stop', 'complete'].includes(timerAction)) {
+        const result = await endTaskTimer(user, {
+          taskId,
+          action: timerAction as 'pause' | 'stop' | 'complete',
+          note: body.note ? String(body.note) : undefined,
+        });
+        return res.status(200).json({ ok: true, ...result });
+      }
+
+      return res.status(400).json({ error: 'Unsupported timer action.' });
+    }
+
     if (req.method === 'GET') {
       if (String(req.query.view || '').toLowerCase() === 'dashboard') {
         const { data, error } = await sb.rpc('get_dashboard_stats', {
@@ -160,8 +264,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     return res.status(405).json({ error: 'Method not allowed' });
   } catch (error) {
-    return res.status(500).json({
-      error: error instanceof Error ? error.message : 'Unable to manage campaigns.',
-    });
+    const message = error instanceof Error ? error.message : 'Unable to manage campaigns or tasks.';
+    const setupMissing = /timer storage is not set up|005_flowlu_task_timer_sessions/i.test(message);
+    return res.status(setupMissing ? 503 : 500).json({ error: message });
   }
 }

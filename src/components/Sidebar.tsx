@@ -1,6 +1,6 @@
-import { BarChart3, ContactRound, FolderOpen, LayoutDashboard, MessageCircle, Settings, ShieldCheck } from 'lucide-react';
+import { BarChart3, ContactRound, FolderOpen, LayoutDashboard, ListTodo, MessageCircle, Settings, ShieldCheck } from 'lucide-react';
 
-export type AppPage = 'dashboard' | 'whatsapp' | 'contacts' | 'users';
+export type AppPage = 'dashboard' | 'tasks' | 'whatsapp' | 'contacts' | 'users';
 
 export function Sidebar({
   page,
@@ -25,6 +25,16 @@ export function Sidebar({
           onClick={() => onNavigate('dashboard')}
         >
           <LayoutDashboard size={18}/><span>Dashboard</span>
+        </button>
+
+        <button
+          className={`nav-item nav-button ${page === 'tasks' ? 'active' : ''}`}
+          onClick={() => {
+            if (page === 'tasks') return;
+            window.location.assign('/tasks');
+          }}
+        >
+          <ListTodo size={18}/><span>Tasks</span>
         </button>
 
         <button
