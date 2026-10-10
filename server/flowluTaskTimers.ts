@@ -56,6 +56,7 @@ export async function getTaskTimerSnapshot(user: StaffUser, taskIds: number[] = 
     .limit(2000);
 
   if (taskIds.length) query = query.in('flowlu_task_id', taskIds.slice(0, 1000));
+  if (user.role !== 'admin') query = query.eq('staff_key', user.id);
 
   const { data, error } = await query;
   if (error) {
