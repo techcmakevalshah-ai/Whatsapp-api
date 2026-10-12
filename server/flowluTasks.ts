@@ -178,8 +178,8 @@ function mapTask(
     deadline,
     planStartDate: flowluDate(row?.plan_start_date),
     planEndDate: flowluDate(row?.plan_end_date),
-    created: flowluDate(row?.created),
-    changed: flowluDate(row?.changed),
+    created: flowluDate(row?.created ?? row?.created_date),
+    changed: flowluDate(row?.changed ?? row?.updated_date),
     closedDate: flowluDate(row?.closed_date),
     timeEstimate: Math.max(0, Number(row?.time_estimate || 0)),
     timeSpent: Math.max(0, Number(row?.time_spent || 0)),
@@ -210,7 +210,7 @@ export async function fetchFlowluTasks(input: {
   try {
     workflowMeta = await fetchTaskWorkflowMeta();
   } catch {
-    // Older/restricted Flowlu accounts can still use Common Kanban system statuses.
+    // A restricted Flowlu API key can still use the Common Kanban task view.
   }
 
   const userMap = new Map<number, string>(users.map((user) => [user.id, user.name]));
@@ -232,7 +232,7 @@ export async function fetchFlowluTasks(input: {
     if (input.workflowId) query['filter[workflow_id]'] = input.workflowId;
     if (input.workflowStageId) query['filter[workflow_stage_id]'] = input.workflowStageId;
 
-    const data = await flowluGet('task/task/list', query);
+    const data = await flowluGet('task/tasks/list', query);
     const response = data?.response || {};
     const rows: any[] = Array.isArray(response?.items) ? response.items : [];
     if (!rows.length) break;
@@ -284,7 +284,7 @@ export async function fetchFlowluTaskById(id: number) {
     stages = [];
   }
 
-  const data = await flowluGet(`task/task/get/${id}`);
+  const data = await flowluGet(`task/tasks/get/${id}`);
   const userMap = new Map<number, string>(users.map((user) => [user.id, user.name]));
   const stageMap = new Map<number, FlowluTaskStage>(stages.map((stage) => [stage.id, stage]));
   const task = mapTask(data?.response || {}, userMap, stageMap);
@@ -316,7 +316,7 @@ export async function createFlowluTask(input: {
     throw new Error('Enter a valid task deadline.');
   }
 
-  const result = await flowluPost('task/task/create', {
+  const result = await flowluPost('task/tasks/create', {
     name,
     responsible_id: input.responsibleId,
     created_by: Number(input.createdBy || input.responsibleId),
@@ -326,10 +326,9 @@ export async function createFlowluTask(input: {
     description: String(input.description || '').trim() || undefined,
     priority: normalizePriority(input.priority),
     time_estimate: Math.max(0, Number(input.timeEstimate || 0)) || undefined,
-    crm_company_id: Number(input.crmCompanyId || 0) || undefined,
+    crm_account_id: Number(input.crmCompanyId || 0) || undefined,
     workflow_id: Number(input.workflowId || 0) || undefined,
     workflow_stage_id: Number(input.workflowStageId || 0) || undefined,
-    status: 1,
     archive_status: 0,
     is_repeat: 0,
     type: 0,
@@ -374,12 +373,11 @@ export async function updateFlowluTask(input: {
     }
   }
 
-  if (input.status !== undefined) {
+  if (input.status !== undefined && input.workflowStageId === undefined) {
     const status = normalizeTaskStatus(input.status);
     body.status = status;
-    body.progress = status === 5 ? 100 : status === 4 ? 75 : status === 3 ? 35 : 0;
   }
 
-  const data = await flowluPost(`task/task/update/${input.id}`, body);
+  const data = await flowluPost(`task/tasks/update/${input.id}`, body);
   return data?.response || { id: input.id };
 }
