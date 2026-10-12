@@ -1,153 +1,417 @@
-.flowlu-shell {
-  min-height: 100vh;
-  background: #f8f9fc;
-  color: #303748;
+.tasks-app-shell {
+  background: #f6f8fc;
 }
 
-.flowlu-shell-sidebar {
-  position: fixed;
-  inset: 0 auto 0 0;
-  z-index: 40;
-  width: 268px;
-  overflow-y: auto;
-  background: #fbfcfe;
-  border-right: 1px solid #e1e5ed;
+.tasks-content {
+  max-width: 1600px;
+  margin: 0 auto;
+  padding: 24px 28px 40px;
 }
 
-.flowlu-shell-brand {
-  height: 78px;
-  display: flex;
-  align-items: center;
-  padding: 0 22px;
-  border-bottom: 1px solid #e2e6ed;
-}
-
-.flowlu-shell-brand-box {
-  min-width: 176px;
-  padding: 8px 12px 7px;
-  background: #ff904d;
-  color: #fff;
-  line-height: 1;
-}
-.flowlu-shell-brand-box b { display: block; font-size: 18px; font-weight: 650; }
-.flowlu-shell-brand-box small { display: block; margin-top: 5px; font-size: 7px; font-weight: 750; letter-spacing: .08em; }
-
-.flowlu-shell-nav { padding: 9px 0 24px; }
-.flowlu-shell-nav button,
-.flowlu-shell-nav .flowlu-nav-static {
-  width: 100%;
-  min-height: 54px;
-  padding: 0 20px;
-  display: flex;
-  align-items: center;
-  gap: 13px;
-  border: 0;
-  border-left: 3px solid transparent;
-  background: transparent;
-  color: #4d5568;
-  font: inherit;
-  font-size: 15px;
-  text-align: left;
-  cursor: pointer;
-}
-.flowlu-shell-nav button:hover { background: #f2f4f8; }
-.flowlu-shell-nav button.active {
-  background: #eef1f7;
-  border-left-color: #3765e8;
-  color: #333c50;
-  font-weight: 550;
-}
-.flowlu-shell-nav svg { flex: 0 0 auto; color: #a0a8b7; }
-.flowlu-shell-nav .active svg { color: #4f70d8; }
-.flowlu-nav-section { border-top: 1px solid #e8ebf0; margin-top: 5px; padding-top: 5px; }
-.flowlu-nav-group-label {
-  min-height: 49px;
-  padding: 0 20px;
-  display: flex;
-  align-items: center;
-  gap: 13px;
-  color: #475064;
-  font-size: 15px;
-  font-weight: 550;
-}
-.flowlu-nav-group-label svg { color: #a0a8b7; }
-.flowlu-nav-sub button {
-  min-height: 39px;
-  padding-left: 56px;
+.tasks-content .flowlu-tasks-page {
+  --flowlu-blue: #16a34a;
+  --flowlu-blue-soft: #ecfdf3;
+  --flowlu-text: #10213d;
+  --flowlu-muted: #718096;
+  --flowlu-border: #dfe6ef;
+  --flowlu-page: #f6f8fc;
+  color: #10213d;
   font-size: 13px;
-  color: #687287;
 }
-.flowlu-nav-static { opacity: .7; cursor: default!important; }
 
-.flowlu-shell-main { margin-left: 268px; min-width: 0; }
-.flowlu-shell-topbar {
-  height: 78px;
-  position: sticky;
-  top: 0;
-  z-index: 35;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+.tasks-content .flowlu-task-head {
+  min-height: auto;
+  grid-template-columns: minmax(250px, 1fr) minmax(220px, 300px) auto;
+  align-items: start;
   gap: 20px;
-  padding: 0 24px 0 28px;
-  background: #fff;
-  border-bottom: 1px solid #e2e6ed;
+  margin: 0 0 18px;
+  padding: 0 0 18px;
+  border-bottom: 1px solid #e5eaf1;
 }
-.flowlu-top-left,
-.flowlu-top-right { display: flex; align-items: center; gap: 16px; }
-.flowlu-top-menu,
-.flowlu-top-action {
-  width: 37px;
-  height: 37px;
-  display: grid;
-  place-items: center;
-  border: 0;
-  background: transparent;
-  color: #8794ae;
-  cursor: pointer;
-  border-radius: 4px;
-}
-.flowlu-top-action:hover,
-.flowlu-top-menu:hover { background: #f2f4f8; }
-.flowlu-top-date { display: flex; align-items: center; gap: 8px; padding-right: 19px; border-right: 3px solid #3a73b4; }
-.flowlu-top-date span { display: flex; flex-direction: column; align-items: center; color: #8b96ad; line-height: 1; }
-.flowlu-top-date small { font-size: 11px; }
-.flowlu-top-date b { margin-top: 4px; font-size: 26px; font-weight: 450; color: #31394a; }
-.flowlu-top-time { display: flex; flex-direction: column; min-width: 88px; color: #a0a8b8; }
-.flowlu-top-time small { font-size: 11px; }
-.flowlu-top-time b { margin-top: 3px; color: #abb3c1; font-size: 20px; font-weight: 450; }
-.flowlu-top-profile { display: flex; align-items: center; gap: 9px; padding-left: 8px; }
-.flowlu-top-avatar { width: 48px; height: 48px; border-radius: 10px; background: #f7dd67; display: grid; place-items: center; color: #3d4657; font-weight: 700; font-size: 14px; }
-.flowlu-top-profile-text { display: flex; flex-direction: column; max-width: 145px; }
-.flowlu-top-profile-text b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #485268; font-size: 12px; }
-.flowlu-top-profile-text small { color: #9aa3b3; font-size: 10px; margin-top: 2px; }
-.flowlu-top-signout { border: 0; background: transparent; color: #96a0b3; cursor: pointer; padding: 7px; border-radius: 4px; }
-.flowlu-top-signout:hover { background: #f1f3f7; }
 
-.flowlu-shell-content { padding: 28px 32px 42px; max-width: none; }
+.tasks-content .flowlu-title-stack h1 {
+  margin: 0 0 8px;
+  color: #0b1830;
+  font-size: 28px;
+  font-weight: 800;
+  letter-spacing: -.35px;
+}
+
+.tasks-content .flowlu-task-tabs {
+  min-height: 44px;
+  gap: 24px;
+}
+
+.tasks-content .flowlu-task-tabs button {
+  height: 42px;
+  color: #66758c;
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.tasks-content .flowlu-task-tabs button.active {
+  color: #15803d;
+  border-bottom-color: #16a34a;
+}
+
+.tasks-content .flowlu-workflow-picker {
+  padding-top: 0;
+  text-align: left;
+}
+
+.tasks-content .flowlu-workflow-picker > span {
+  color: #718096;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: .08em;
+}
+
+.tasks-content .flowlu-workflow-picker select {
+  height: 43px;
+  border: 1px solid #dce3ec;
+  border-radius: 8px;
+  background: #fff;
+  padding: 0 34px 0 12px;
+  color: #334155;
+  font-size: 13px;
+  font-weight: 700;
+  text-align: left;
+}
+
+.tasks-content .flowlu-task-head-actions {
+  gap: 9px;
+}
+
+.tasks-content .flowlu-create-btn {
+  height: 43px;
+  min-width: 112px;
+  border-radius: 8px;
+  background: #16a34a;
+  box-shadow: 0 8px 18px rgba(22, 163, 74, .16);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.tasks-content .flowlu-create-btn:hover {
+  background: #15803d;
+}
+
+.tasks-content .flowlu-soft-btn {
+  height: 43px;
+  min-width: 126px;
+  border: 1px solid #dbe3ee;
+  border-radius: 8px;
+  background: #fff;
+  color: #2254c6;
+  font-size: 13px;
+  font-weight: 750;
+}
+
+.tasks-content .flowlu-soft-btn:hover {
+  background: #f8fafc;
+}
+
+.tasks-content .flowlu-icon-btn {
+  display: none;
+}
+
+.tasks-content .flowlu-running-strip {
+  margin-bottom: 14px;
+  border: 1px solid #ccebd4;
+  border-radius: 10px;
+  background: #f2fbf5;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, .02);
+}
+
+.tasks-content .flowlu-timer-setup-warning,
+.tasks-content .flowlu-task-alert {
+  border-radius: 9px;
+}
+
+.tasks-content .flowlu-task-toolbar {
+  gap: 10px;
+  margin: 0 0 12px;
+  padding: 12px;
+  border: 1px solid #dfe6ef;
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, .02);
+}
+
+.tasks-content .flowlu-task-search {
+  width: min(420px, 42vw);
+  height: 42px;
+  border: 1px solid #dce3ec;
+  border-radius: 7px;
+  background: #fff;
+}
+
+.tasks-content .flowlu-task-search input {
+  color: #10213d;
+  font-size: 13px;
+}
+
+.tasks-content .flowlu-filter-icon {
+  width: 42px;
+  height: 42px;
+  border-radius: 7px;
+  background: #16a34a;
+}
+
+.tasks-content .flowlu-filter-icon:hover {
+  background: #15803d;
+}
+
+.tasks-content .flowlu-add-quick {
+  display: none;
+}
+
+.tasks-content .flowlu-task-toolbar select {
+  height: 42px;
+  min-width: 145px;
+  border: 1px solid #dce3ec;
+  border-radius: 7px;
+  background: #fff;
+  color: #334155;
+  font-size: 12px;
+}
+
+.tasks-content .flowlu-clear-filters {
+  color: #15803d;
+  font-weight: 750;
+}
+
+.tasks-content .flowlu-task-chips {
+  gap: 10px;
+  margin: 0 0 18px;
+}
+
+.tasks-content .flowlu-task-chips button {
+  min-height: 38px;
+  padding: 0 12px;
+  border: 1px solid #dfe6ef;
+  border-radius: 8px;
+  background: #fff;
+  color: #43526a;
+  font-size: 12px;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, .02);
+}
+
+.tasks-content .flowlu-task-chips button.active {
+  border-color: #86d49c;
+  background: #f2fbf5;
+  box-shadow: inset 0 0 0 1px #86d49c;
+}
+
+.tasks-content .flowlu-task-chips .blue {
+  background: #2563eb;
+}
+
+.tasks-content .flowlu-task-chips .amber {
+  background: #f59e0b;
+}
+
+.tasks-content .flowlu-task-chips .red {
+  background: #ef4444;
+}
+
+.tasks-content .flowlu-result-count {
+  color: #718096;
+}
+
+.tasks-content .flowlu-kanban {
+  grid-auto-columns: minmax(285px, 360px);
+  gap: 14px;
+  padding: 0 1px 20px;
+}
+
+.tasks-content .flowlu-kanban-column {
+  min-width: 285px;
+}
+
+.tasks-content .flowlu-kanban-column > header {
+  min-height: 82px;
+  padding: 14px 15px 12px;
+  border: 1px solid #dfe6ef;
+  border-top: 4px solid #94a3b8;
+  border-left: 1px solid #dfe6ef;
+  border-radius: 10px;
+  background: #fff !important;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, .02);
+}
+
+.tasks-content .flowlu-kanban-column > header strong {
+  margin-bottom: 5px;
+  color: #10213d;
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.tasks-content .flowlu-kanban-column > header span,
+.tasks-content .flowlu-kanban-column > header > b {
+  color: #718096;
+  font-size: 11px;
+}
+
+.tasks-content .flowlu-kanban-column.new > header,
+.tasks-content .flowlu-kanban-column.new-alt > header {
+  border-top-color: #3b82f6;
+}
+
+.tasks-content .flowlu-kanban-column.progressing > header,
+.tasks-content .flowlu-kanban-column.progressing-alt > header {
+  border-top-color: #8b5cf6;
+}
+
+.tasks-content .flowlu-kanban-column.review > header {
+  border-top-color: #f59e0b;
+}
+
+.tasks-content .flowlu-kanban-column.completed > header {
+  border-top-color: #16a34a;
+}
+
+.tasks-content .flowlu-kanban-cards {
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.tasks-content .flowlu-task-card {
+  min-height: 132px;
+  padding: 14px 15px 12px;
+  border: 1px solid #dfe6ef;
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, .025);
+}
+
+.tasks-content .flowlu-task-card:hover {
+  border-color: #cbd5e1;
+  box-shadow: 0 8px 20px rgba(15, 23, 42, .055);
+}
+
+.tasks-content .flowlu-task-card.running {
+  border-color: #86d49c;
+  box-shadow: inset 0 0 0 1px rgba(22, 163, 74, .08);
+}
+
+.tasks-content .flowlu-card-title-row h3 {
+  color: #10213d;
+  font-size: 14px;
+  font-weight: 750;
+}
+
+.tasks-content .flowlu-task-card p,
+.tasks-content .flowlu-card-person,
+.tasks-content .flowlu-person-cell,
+.tasks-content .flowlu-card-meta {
+  color: #66758c;
+}
+
+.tasks-content .flowlu-avatar {
+  background: #ecfdf3;
+  border-color: #ccebd4;
+  color: #15803d;
+}
+
+.tasks-content .flowlu-time-progress {
+  background: #edf1f5;
+}
+
+.tasks-content .flowlu-time-progress span {
+  background: #16a34a;
+}
+
+.tasks-content .flowlu-task-loading,
+.tasks-content .flowlu-history-empty {
+  border: 1px solid #dfe6ef;
+  border-radius: 10px;
+  background: #fff;
+}
+
+.tasks-content .flowlu-list-wrap,
+.tasks-content .flowlu-history-wrap,
+.tasks-content .flowlu-history-summary > div {
+  border-radius: 10px;
+  border-color: #dfe6ef;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, .02);
+}
+
+.tasks-content .flowlu-drawer,
+.tasks-content .flowlu-create-modal,
+.tasks-content .flowlu-config-modal {
+  border-radius: 14px 0 0 14px;
+}
+
+.tasks-content .flowlu-save-task,
+.tasks-content .flowlu-create-submit,
+.tasks-content .flowlu-config-refresh {
+  background: #16a34a;
+}
+
+.tasks-content .flowlu-save-task:hover,
+.tasks-content .flowlu-create-submit:hover,
+.tasks-content .flowlu-config-refresh:hover {
+  background: #15803d;
+}
 
 @media (max-width: 1100px) {
-  .flowlu-shell-sidebar { width: 82px; }
-  .flowlu-shell-brand { padding: 0 10px; justify-content: center; }
-  .flowlu-shell-brand-box { min-width: 48px; width: 48px; padding: 9px 5px; text-align: center; }
-  .flowlu-shell-brand-box b { font-size: 12px; }
-  .flowlu-shell-brand-box small { display: none; }
-  .flowlu-shell-nav button,
-  .flowlu-shell-nav .flowlu-nav-static,
-  .flowlu-nav-group-label { justify-content: center; padding: 0; }
-  .flowlu-shell-nav button span,
-  .flowlu-shell-nav .flowlu-nav-static span,
-  .flowlu-nav-group-label span,
-  .flowlu-nav-sub { display: none; }
-  .flowlu-shell-main { margin-left: 82px; }
+  .tasks-content .flowlu-task-head {
+    grid-template-columns: 1fr auto;
+  }
+
+  .tasks-content .flowlu-workflow-picker {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    max-width: 320px;
+  }
+
+  .tasks-content .flowlu-task-toolbar {
+    flex-wrap: wrap;
+  }
+
+  .tasks-content .flowlu-toolbar-spacer {
+    display: none;
+  }
 }
 
-@media (max-width: 720px) {
-  .flowlu-shell-sidebar { display: none; }
-  .flowlu-shell-main { margin-left: 0; }
-  .flowlu-shell-topbar { height: 64px; padding: 0 12px; }
-  .flowlu-top-date,
-  .flowlu-top-time,
-  .flowlu-top-profile-text { display: none; }
-  .flowlu-shell-content { padding: 18px 14px 30px; }
+@media (max-width: 700px) {
+  .tasks-content {
+    padding: 16px;
+  }
+
+  .tasks-content .flowlu-task-head {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .tasks-content .flowlu-task-head-actions {
+    width: 100%;
+  }
+
+  .tasks-content .flowlu-create-btn,
+  .tasks-content .flowlu-soft-btn {
+    flex: 1;
+  }
+
+  .tasks-content .flowlu-workflow-picker,
+  .tasks-content .flowlu-task-search,
+  .tasks-content .flowlu-task-toolbar select {
+    width: 100%;
+    max-width: none;
+  }
+
+  .tasks-content .flowlu-task-toolbar {
+    align-items: stretch;
+  }
+
+  .tasks-content .flowlu-task-chips {
+    align-items: stretch;
+  }
+
+  .tasks-content .flowlu-result-count {
+    width: 100%;
+    margin-left: 0;
+  }
 }
