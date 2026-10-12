@@ -1,6 +1,6 @@
 import type { StaffUser } from './auth.js';
 import { supabaseAdmin } from './supabaseAdmin.js';
-import { fetchFlowluTaskById, updateFlowluTask } from './flowluTasks.js';
+import { fetchFlowluTaskById, fetchFlowluTasks, updateFlowluTask } from './flowluTasks.js';
 
 export type FlowluTaskTimerSession = {
   id: string;
@@ -196,9 +196,26 @@ export async function endTaskTimer(
   let flowluSyncWarning = '';
   try {
     const task = await fetchFlowluTaskById(input.taskId);
+    let workflowStageId: number | undefined;
+
+    if (input.action === 'complete' && task.workflowId) {
+      const board = await fetchFlowluTasks({
+        workflowId: task.workflowId,
+        includeCompleted: true,
+        maxPages: 1,
+      });
+      const stages = board.stages
+        .filter((stage) => stage.workflowId === task.workflowId)
+        .sort((a, b) => a.sort - b.sort || a.id - b.id);
+      workflowStageId = stages.at(-1)?.id;
+    }
+
     await updateFlowluTask({
       id: task.id,
       timeSpent: Math.max(0, task.timeSpent) + durationSeconds,
+      workflowId: workflowStageId ? task.workflowId : undefined,
+      workflowStageId,
+      status: input.action === 'complete' && !workflowStageId ? 5 : undefined,
     });
   } catch (error) {
     flowluSyncWarning = error instanceof Error ? error.message : 'Unable to sync the elapsed time to Flowlu.';
