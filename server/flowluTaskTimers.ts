@@ -156,14 +156,6 @@ export async function startTaskTimer(user: StaffUser, input: { taskId: number; t
     throw error;
   }
 
-  if (task.status === 1) {
-    try {
-      await updateFlowluTask({ id: task.id, status: 3 });
-    } catch {
-      // The timer is still valid even if the Flowlu status could not be advanced.
-    }
-  }
-
   return { session: mapSession(data), alreadyRunning: false };
 }
 
@@ -207,7 +199,6 @@ export async function endTaskTimer(
     await updateFlowluTask({
       id: task.id,
       timeSpent: Math.max(0, task.timeSpent) + durationSeconds,
-      status: input.action === 'complete' ? 5 : undefined,
     });
   } catch (error) {
     flowluSyncWarning = error instanceof Error ? error.message : 'Unable to sync the elapsed time to Flowlu.';
