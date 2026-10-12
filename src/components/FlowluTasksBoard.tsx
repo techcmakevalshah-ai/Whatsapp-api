@@ -15,6 +15,7 @@ import {
   Plus,
   RefreshCw,
   Search,
+  Settings2,
   Square,
   TimerReset,
   UserRound,
@@ -28,6 +29,7 @@ import {
   updateFlowluBoardTask,
   type FlowluTask,
   type FlowluTaskBoardResponse,
+  type FlowluTaskStage,
   type FlowluTaskStatus,
   type FlowluTaskTimerSession,
 } from '../lib/flowluTasks';
@@ -36,20 +38,26 @@ import './FlowluTasksBoard.css';
 type TaskTab = 'board' | 'list' | 'history';
 type QuickFilter = 'all' | 'today' | 'no-deadline' | 'overdue';
 
-const STATUS_COLUMNS: Array<{
-  id: FlowluTaskStatus;
+type BoardColumn = {
+  key: string;
   label: string;
+  systemStatus: FlowluTaskStatus;
+  stageId?: number;
   className: string;
-}> = [
-  { id: 1, label: 'New', className: 'new' },
-  { id: 3, label: 'In Progress', className: 'progressing' },
-  { id: 4, label: 'Review', className: 'review' },
-  { id: 5, label: 'Completed', className: 'completed' },
+};
+
+const SYSTEM_COLUMNS: BoardColumn[] = [
+  { key: 'system-1', label: 'New', systemStatus: 1, className: 'new' },
+  { key: 'system-3', label: 'In Progress', systemStatus: 3, className: 'progressing' },
+  { key: 'system-4', label: 'Review', systemStatus: 4, className: 'review' },
+  { key: 'system-5', label: 'Completed', systemStatus: 5, className: 'completed' },
 ];
 
 const EMPTY_BOARD: FlowluTaskBoardResponse = {
   tasks: [],
   users: [],
+  workflows: [],
+  stages: [],
   timerReady: true,
   sessions: [],
   totalsByTask: {},
@@ -107,7 +115,7 @@ function isSameDay(a: Date, b: Date) {
     && a.getDate() === b.getDate();
 }
 
-function runningSeconds(session: FlowluTaskTimerSession | undefined, nowMs: number) {
+function runningSeconds(session: FlowluTaskTimerSession | undefined | null, nowMs: number) {
   if (!session) return 0;
   if (session.endedAt) return session.durationSeconds;
   const started = new Date(session.startedAt).getTime();
@@ -121,6 +129,17 @@ function priorityLabel(priority: number) {
   return 'Medium';
 }
 
+function statusLabel(status: FlowluTaskStatus) {
+  return SYSTEM_COLUMNS.find((column) => column.systemStatus === status)?.label || 'Task';
+}
+
+function columnClass(index: number, status: FlowluTaskStatus) {
+  if (status === 5) return 'completed';
+  if (status === 4) return 'review';
+  if (status === 3) return index % 2 ? 'progressing' : 'progressing-alt';
+  return index % 2 ? 'new-alt' : 'new';
+}
+
 export function FlowluTasksBoard() {
   const [data, setData] = useState<FlowluTaskBoardResponse>(EMPTY_BOARD);
   const [tab, setTab] = useState<TaskTab>('board');
@@ -131,8 +150,13 @@ export function FlowluTasksBoard() {
   const [assigneeId, setAssigneeId] = useState(0);
   const [priority, setPriority] = useState(0);
   const [quickFilter, setQuickFilter] = useState<QuickFilter>('all');
+  const [selectedWorkflowId, setSelectedWorkflowId] = useState(() => {
+    if (typeof window === 'undefined') return 0;
+    return Number(window.localStorage.getItem('flowlu_task_workflow_id') || 0) || 0;
+  });
   const [selectedTaskId, setSelectedTaskId] = useState<number | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
+  const [configOpen, setConfigOpen] = useState(false);
   const [workingId, setWorkingId] = useState<number | null>(null);
   const [history, setHistory] = useState<FlowluTaskTimerSession[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
@@ -144,12 +168,16 @@ export function FlowluTasksBoard() {
     description: '',
     priority: 2 as 1 | 2 | 3,
     estimateMinutes: 30,
+    workflowId: 0,
+    workflowStageId: 0,
   });
   const [editForm, setEditForm] = useState({
     responsibleId: 0,
     deadline: '',
     priority: 2 as 1 | 2 | 3,
     estimateMinutes: 0,
+    workflowId: 0,
+    workflowStageId: 0,
   });
 
   const load = useCallback(async (quiet = false) => {
@@ -157,7 +185,7 @@ export function FlowluTasksBoard() {
     setError('');
     try {
       const next = await getFlowluTasks({ includeCompleted: true });
-      setData(next);
+      setData({ ...EMPTY_BOARD, ...next });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unable to load Flowlu tasks.');
     } finally {
@@ -175,6 +203,13 @@ export function FlowluTasksBoard() {
     const clock = window.setInterval(() => setTick(Date.now()), 1000);
     return () => window.clearInterval(clock);
   }, []);
+
+  useEffect(() => {
+    if (selectedWorkflowId && !data.workflows.some((workflow) => workflow.id === selectedWorkflowId)) {
+      setSelectedWorkflowId(0);
+      window.localStorage.removeItem('flowlu_task_workflow_id');
+    }
+  }, [data.workflows, selectedWorkflowId]);
 
   useEffect(() => {
     if (tab !== 'history' || !data.timerReady) return;
@@ -197,13 +232,33 @@ export function FlowluTasksBoard() {
       deadline: dateTimeInput(selectedTask.deadline),
       priority: selectedTask.priority,
       estimateMinutes: Math.round(selectedTask.timeEstimate / 60),
+      workflowId: selectedTask.workflowId || 0,
+      workflowStageId: selectedTask.workflowStageId || 0,
     });
-  }, [selectedTask?.id, selectedTask?.responsibleId, selectedTask?.deadline, selectedTask?.priority, selectedTask?.timeEstimate]);
+  }, [selectedTask]);
+
+  const selectedWorkflow = data.workflows.find((workflow) => workflow.id === selectedWorkflowId) || null;
+  const workflowStages = useMemo(
+    () => data.stages.filter((stage) => stage.workflowId === selectedWorkflowId),
+    [data.stages, selectedWorkflowId],
+  );
+
+  const columns = useMemo<BoardColumn[]>(() => {
+    if (!selectedWorkflowId || !workflowStages.length) return SYSTEM_COLUMNS;
+    return workflowStages.map((stage, index) => ({
+      key: `stage-${stage.id}`,
+      label: stage.name,
+      systemStatus: stage.systemStatus,
+      stageId: stage.id,
+      className: columnClass(index, stage.systemStatus),
+    }));
+  }, [selectedWorkflowId, workflowStages]);
 
   const filteredTasks = useMemo(() => {
     const search = query.trim().toLowerCase();
     const today = new Date();
     return data.tasks.filter((task) => {
+      if (selectedWorkflowId && task.workflowId !== selectedWorkflowId) return false;
       if (search && !`${task.name} ${task.description} ${task.responsibleName}`.toLowerCase().includes(search)) return false;
       if (assigneeId && task.responsibleId !== assigneeId) return false;
       if (priority && task.priority !== priority) return false;
@@ -215,7 +270,7 @@ export function FlowluTasksBoard() {
       }
       return true;
     });
-  }, [data.tasks, query, assigneeId, priority, quickFilter]);
+  }, [data.tasks, selectedWorkflowId, query, assigneeId, priority, quickFilter]);
 
   const counters = useMemo(() => {
     const today = new Date();
@@ -223,19 +278,27 @@ export function FlowluTasksBoard() {
     let noDeadline = 0;
     let overdue = 0;
     for (const task of data.tasks) {
-      if (!task.deadline) noDeadline += 1;
+      if (selectedWorkflowId && task.workflowId !== selectedWorkflowId) continue;
+      if (!task.deadline && task.status !== 5) noDeadline += 1;
       const due = parseDate(task.deadline);
       if (due && isSameDay(due, today) && task.status !== 5) dueToday += 1;
       if (task.overdue) overdue += 1;
     }
     return { dueToday, noDeadline, overdue };
-  }, [data.tasks]);
+  }, [data.tasks, selectedWorkflowId]);
 
   const taskSpent = useCallback((task: FlowluTask) => {
     const tracked = Number(data.totalsByTask[String(task.id)] || 0)
       + runningSeconds(data.runningByTask[String(task.id)], tick);
     return Math.max(task.timeSpent, tracked);
   }, [data.totalsByTask, data.runningByTask, tick]);
+
+  const taskStageName = (task: FlowluTask) => {
+    if (task.workflowStageId) {
+      return data.stages.find((stage) => stage.id === task.workflowStageId)?.name || statusLabel(task.status);
+    }
+    return statusLabel(task.status);
+  };
 
   const changeStatus = async (task: FlowluTask, status: FlowluTaskStatus) => {
     setWorkingId(task.id);
@@ -246,6 +309,24 @@ export function FlowluTasksBoard() {
       await load(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unable to update task.');
+    } finally {
+      setWorkingId(null);
+    }
+  };
+
+  const changeStage = async (task: FlowluTask, stage: FlowluTaskStage) => {
+    setWorkingId(task.id);
+    setError('');
+    try {
+      await updateFlowluBoardTask({
+        id: task.id,
+        workflowId: stage.workflowId,
+        workflowStageId: stage.id,
+        status: stage.systemStatus,
+      });
+      await load(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unable to move task to this stage.');
     } finally {
       setWorkingId(null);
     }
@@ -282,12 +363,16 @@ export function FlowluTasksBoard() {
     setError('');
     setNotice('');
     try {
+      const selectedStage = data.stages.find((stage) => stage.id === editForm.workflowStageId);
       await updateFlowluBoardTask({
         id: selectedTask.id,
         responsibleId: editForm.responsibleId || undefined,
         deadline: editForm.deadline || undefined,
         priority: editForm.priority,
         timeEstimateSeconds: Math.max(0, Number(editForm.estimateMinutes || 0)) * 60,
+        workflowId: editForm.workflowId || null,
+        workflowStageId: editForm.workflowStageId || null,
+        status: selectedStage?.systemStatus,
       });
       setNotice('Task updated in Flowlu.');
       await load(true);
@@ -311,16 +396,20 @@ export function FlowluTasksBoard() {
         description: createForm.description || undefined,
         priority: createForm.priority,
         timeEstimateSeconds: Math.max(0, Number(createForm.estimateMinutes || 0)) * 60,
+        workflowId: createForm.workflowId || undefined,
+        workflowStageId: createForm.workflowStageId || undefined,
       });
       setCreateOpen(false);
-      setCreateForm({
+      setCreateForm((current) => ({
         name: '',
-        responsibleId: createForm.responsibleId,
+        responsibleId: current.responsibleId,
         deadline: '',
         description: '',
         priority: 2,
         estimateMinutes: 30,
-      });
+        workflowId: selectedWorkflowId,
+        workflowStageId: workflowStages[0]?.id || 0,
+      }));
       setNotice('Task created in Flowlu.');
       await load(true);
     } catch (err) {
@@ -328,6 +417,22 @@ export function FlowluTasksBoard() {
     } finally {
       setWorkingId(null);
     }
+  };
+
+  const openCreate = () => {
+    setCreateForm((current) => ({
+      ...current,
+      workflowId: selectedWorkflowId,
+      workflowStageId: workflowStages[0]?.id || 0,
+    }));
+    setCreateOpen(true);
+  };
+
+  const chooseWorkflow = (workflowId: number) => {
+    setSelectedWorkflowId(workflowId);
+    if (workflowId) window.localStorage.setItem('flowlu_task_workflow_id', String(workflowId));
+    else window.localStorage.removeItem('flowlu_task_workflow_id');
+    setQuickFilter('all');
   };
 
   const currentTimerTask = data.currentTimer
@@ -354,29 +459,63 @@ export function FlowluTasksBoard() {
     return totals;
   }, [history, tick]);
 
+  const completeTask = async (task: FlowluTask) => {
+    const completedStage = task.workflowId
+      ? data.stages.find((stage) => stage.workflowId === task.workflowId && stage.systemStatus === 5)
+      : undefined;
+    if (completedStage) return changeStage(task, completedStage);
+    return changeStatus(task, 5);
+  };
+
+  const reopenTask = async (task: FlowluTask) => {
+    const reopenStage = task.workflowId
+      ? data.stages.find((stage) => stage.workflowId === task.workflowId && [3, 1].includes(stage.systemStatus))
+      : undefined;
+    if (reopenStage) return changeStage(task, reopenStage);
+    return changeStatus(task, 3);
+  };
+
+  const boardTaskMatchesColumn = (task: FlowluTask, column: BoardColumn) => (
+    column.stageId ? task.workflowStageId === column.stageId : task.status === column.systemStatus
+  );
+
   return (
     <section className="flowlu-tasks-page">
       <div className="flowlu-task-head">
-        <div>
+        <div className="flowlu-title-stack">
           <h1>Tasks</h1>
           <div className="flowlu-task-tabs" role="tablist">
             <button className={tab === 'board' ? 'active' : ''} onClick={() => setTab('board')}>
-              <Columns3 size={16}/> Kanban Board
+              Kanban Board
             </button>
             <button className={tab === 'list' ? 'active' : ''} onClick={() => setTab('list')}>
-              <ListTodo size={16}/> List
+              List
             </button>
             <button className={tab === 'history' ? 'active' : ''} onClick={() => setTab('history')}>
-              <History size={16}/> Time History
+              Time History
             </button>
           </div>
         </div>
+
+        <label className="flowlu-workflow-picker" title="Choose the Flowlu task workflow shown on this board">
+          <span>Workflow</span>
+          <select value={selectedWorkflowId} onChange={(event) => chooseWorkflow(Number(event.target.value))}>
+            <option value={0}>Common Kanban</option>
+            {data.workflows.map((workflow) => (
+              <option key={workflow.id} value={workflow.id}>{workflow.name}</option>
+            ))}
+          </select>
+        </label>
+
         <div className="flowlu-task-head-actions">
-          <button className="flowlu-refresh-btn" onClick={() => void load()} disabled={loading} title="Refresh Flowlu tasks">
-            <RefreshCw size={18} className={loading ? 'spinning' : ''}/>
-          </button>
-          <button className="flowlu-create-btn" onClick={() => setCreateOpen(true)}>
+          <button className="flowlu-create-btn" onClick={openCreate}>
             <Plus size={18}/> Create
+          </button>
+          <button className="flowlu-soft-btn" onClick={() => setConfigOpen(true)}>
+            Configuration
+          </button>
+          <button className="flowlu-icon-btn" onClick={() => setConfigOpen(true)} title="Task configuration">
+            <Settings2 size={21}/>
           </button>
         </div>
       </div>
@@ -396,7 +535,7 @@ export function FlowluTasksBoard() {
       {!data.timerReady && (
         <div className="flowlu-timer-setup-warning">
           <AlertCircle size={17}/>
-          <span>Task board is live. Timer history needs the Supabase timer migration before Start / Pause / Stop can be used.</span>
+          <span>Flowlu tasks are connected. Timer History needs migration 005 before Start / Pause / Stop can be used.</span>
         </div>
       )}
 
@@ -407,10 +546,12 @@ export function FlowluTasksBoard() {
         <>
           <div className="flowlu-task-toolbar">
             <label className="flowlu-task-search">
-              <Search size={18}/>
+              <Search size={19}/>
               <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search"/>
             </label>
-            <div className="flowlu-filter-icon"><Filter size={18}/></div>
+            <button className="flowlu-filter-icon" title="Filters"><Filter size={20}/></button>
+            <button className="flowlu-add-quick" onClick={openCreate} title="Create task"><Plus size={25}/></button>
+            <div className="flowlu-toolbar-spacer"/>
             <select value={assigneeId} onChange={(event) => setAssigneeId(Number(event.target.value))}>
               <option value={0}>All assignees</option>
               {data.users.map((user) => <option key={user.id} value={user.id}>{user.name}</option>)}
@@ -427,7 +568,7 @@ export function FlowluTasksBoard() {
                 setAssigneeId(0);
                 setPriority(0);
                 setQuickFilter('all');
-              }}>Clear filters</button>
+              }}>Clear</button>
             ) : null}
           </div>
 
@@ -441,6 +582,7 @@ export function FlowluTasksBoard() {
             <button className={quickFilter === 'overdue' ? 'active' : ''} onClick={() => setQuickFilter(quickFilter === 'overdue' ? 'all' : 'overdue')}>
               <b className="red">{counters.overdue}</b> Overdue
             </button>
+            <span className="flowlu-result-count">{filteredTasks.length} matching tasks</span>
           </div>
         </>
       )}
@@ -449,10 +591,10 @@ export function FlowluTasksBoard() {
         <div className="flowlu-task-loading">Loading Flowlu tasks…</div>
       ) : tab === 'board' ? (
         <div className="flowlu-kanban">
-          {STATUS_COLUMNS.map((column) => {
-            const tasks = filteredTasks.filter((task) => task.status === column.id);
+          {columns.map((column) => {
+            const tasks = filteredTasks.filter((task) => boardTaskMatchesColumn(task, column));
             return (
-              <section className={`flowlu-kanban-column ${column.className}`} key={column.id}>
+              <section className={`flowlu-kanban-column ${column.className}`} key={column.key}>
                 <header>
                   <div>
                     <strong>{column.label}</strong>
@@ -474,16 +616,18 @@ export function FlowluTasksBoard() {
                           <h3>{task.name}</h3>
                           {task.priority === 3 && <Flag size={15} className="priority-high"/>}
                         </div>
-                        {task.description && <p>{task.description.replace(/<[^>]*>/g, '').slice(0, 120)}</p>}
-                        <div className="flowlu-card-person">
-                          <span className="flowlu-avatar">{initials(task.responsibleName)}</span>
-                          <span>{task.responsibleName}</span>
-                        </div>
-                        <div className="flowlu-card-meta">
-                          <span className={task.overdue ? 'deadline overdue' : 'deadline'}>
-                            <CalendarDays size={14}/>{dateLabel(task.deadline)}
-                          </span>
-                          <span><Clock3 size={14}/>{formatSeconds(spent)}</span>
+                        {task.description && <p>{task.description.replace(/<[^>]*>/g, '').slice(0, 105)}</p>}
+                        <div className="flowlu-card-lower">
+                          <div className="flowlu-card-person">
+                            <span className="flowlu-avatar">{initials(task.responsibleName)}</span>
+                            <span>{task.responsibleName}</span>
+                          </div>
+                          <div className="flowlu-card-meta">
+                            <span className={task.overdue ? 'deadline overdue' : 'deadline'}>
+                              <CalendarDays size={14}/>{dateLabel(task.deadline)}
+                            </span>
+                            <span><Clock3 size={14}/>{formatSeconds(spent)}</span>
+                          </div>
                         </div>
                         {task.timeEstimate > 0 && (
                           <div className="flowlu-time-progress">
@@ -512,14 +656,14 @@ export function FlowluTasksBoard() {
           <table className="flowlu-task-list">
             <thead>
               <tr>
-                <th>Task</th><th>Status</th><th>Assignee</th><th>Deadline</th><th>Priority</th><th>Time Spent</th><th/>
+                <th>Task</th><th>Stage</th><th>Assignee</th><th>Deadline</th><th>Priority</th><th>Time Spent</th><th/>
               </tr>
             </thead>
             <tbody>
               {filteredTasks.map((task) => (
                 <tr key={task.id} onClick={() => setSelectedTaskId(task.id)}>
                   <td><strong>{task.name}</strong><small>#{task.id}</small></td>
-                  <td><span className={`flowlu-status-pill s${task.status}`}>{STATUS_COLUMNS.find((item) => item.id === task.status)?.label}</span></td>
+                  <td><span className={`flowlu-status-pill s${task.status}`}>{taskStageName(task)}</span></td>
                   <td><span className="flowlu-person-cell"><span className="flowlu-avatar">{initials(task.responsibleName)}</span>{task.responsibleName}</span></td>
                   <td className={task.overdue ? 'overdue-text' : ''}>{dateLabel(task.deadline)}</td>
                   <td>{priorityLabel(task.priority)}</td>
@@ -542,7 +686,7 @@ export function FlowluTasksBoard() {
           {historyLoading ? (
             <div className="flowlu-task-loading">Loading timer history…</div>
           ) : !data.timerReady ? (
-            <div className="flowlu-history-empty">Run the timer migration first to start keeping task history.</div>
+            <div className="flowlu-history-empty">Timer History is waiting for migration 005_flowlu_task_timer_sessions.sql.</div>
           ) : (
             <div className="flowlu-task-list-wrap">
               <table className="flowlu-task-list history-table">
@@ -599,18 +743,37 @@ export function FlowluTasksBoard() {
                     className="primary"
                     onClick={() => void timerAction(selectedTask, 'start')}
                     disabled={!data.timerReady || Boolean(data.currentTimer) || workingId === selectedTask.id || selectedTask.status === 5}
-                    title={data.currentTimer ? 'Stop the currently running timer first.' : ''}
+                    title={!data.timerReady ? 'Timer storage is not configured.' : data.currentTimer ? 'Stop the currently running timer first.' : ''}
                   ><Play size={16}/> Start Timer</button>
                 )}
               </div>
             </div>
 
             <div className="flowlu-drawer-fields">
-              <label>Status
-                <select value={selectedTask.status} onChange={(event) => void changeStatus(selectedTask, Number(event.target.value) as FlowluTaskStatus)} disabled={workingId === selectedTask.id}>
-                  {STATUS_COLUMNS.map((status) => <option value={status.id} key={status.id}>{status.label}</option>)}
+              <label>Workflow
+                <select value={editForm.workflowId} onChange={(event) => {
+                  const nextWorkflowId = Number(event.target.value);
+                  const firstStage = data.stages.find((stage) => stage.workflowId === nextWorkflowId);
+                  setEditForm((current) => ({ ...current, workflowId: nextWorkflowId, workflowStageId: firstStage?.id || 0 }));
+                }}>
+                  <option value={0}>Common Kanban</option>
+                  {data.workflows.map((workflow) => <option value={workflow.id} key={workflow.id}>{workflow.name}</option>)}
                 </select>
               </label>
+              {editForm.workflowId ? (
+                <label>Stage
+                  <select value={editForm.workflowStageId} onChange={(event) => setEditForm((current) => ({ ...current, workflowStageId: Number(event.target.value) }))}>
+                    <option value={0}>Choose stage</option>
+                    {data.stages.filter((stage) => stage.workflowId === editForm.workflowId).map((stage) => <option value={stage.id} key={stage.id}>{stage.name}</option>)}
+                  </select>
+                </label>
+              ) : (
+                <label>Status
+                  <select value={selectedTask.status} onChange={(event) => void changeStatus(selectedTask, Number(event.target.value) as FlowluTaskStatus)} disabled={workingId === selectedTask.id}>
+                    {SYSTEM_COLUMNS.map((status) => <option value={status.systemStatus} key={status.key}>{status.label}</option>)}
+                  </select>
+                </label>
+              )}
               <label>Responsible
                 <select value={editForm.responsibleId} onChange={(event) => setEditForm((current) => ({ ...current, responsibleId: Number(event.target.value) }))}>
                   <option value={0}>Choose user</option>
@@ -665,10 +828,10 @@ export function FlowluTasksBoard() {
                 data.currentTimer?.taskId === selectedTask.id ? (
                   <button className="complete" onClick={() => void timerAction(selectedTask, 'complete')} disabled={workingId === selectedTask.id}><CheckCircle2 size={17}/> Stop Timer & Complete Task</button>
                 ) : (
-                  <button className="complete" onClick={() => void changeStatus(selectedTask, 5)} disabled={workingId === selectedTask.id}><CheckCircle2 size={17}/> Complete Task</button>
+                  <button className="complete" onClick={() => void completeTask(selectedTask)} disabled={workingId === selectedTask.id}><CheckCircle2 size={17}/> Complete Task</button>
                 )
               ) : (
-                <button onClick={() => void changeStatus(selectedTask, 3)} disabled={workingId === selectedTask.id}><RefreshCw size={16}/> Reopen Task</button>
+                <button onClick={() => void reopenTask(selectedTask)} disabled={workingId === selectedTask.id}><RefreshCw size={16}/> Reopen Task</button>
               )}
             </div>
           </aside>
@@ -681,7 +844,7 @@ export function FlowluTasksBoard() {
         }}>
           <aside className="flowlu-task-drawer create-drawer">
             <div className="flowlu-drawer-head">
-              <div><small>Flowlu</small><h2>Create Task</h2></div>
+              <div><small>Flowlu Tasks</small><h2>Create Task</h2></div>
               <button onClick={() => setCreateOpen(false)}><X size={20}/></button>
             </div>
             <div className="flowlu-create-form">
@@ -694,6 +857,26 @@ export function FlowluTasksBoard() {
                   {data.users.map((user) => <option key={user.id} value={user.id}>{user.name}</option>)}
                 </select>
               </label>
+              {data.workflows.length > 0 && (
+                <div className="flowlu-create-split">
+                  <label>Workflow
+                    <select value={createForm.workflowId} onChange={(event) => {
+                      const nextWorkflowId = Number(event.target.value);
+                      const firstStage = data.stages.find((stage) => stage.workflowId === nextWorkflowId);
+                      setCreateForm((current) => ({ ...current, workflowId: nextWorkflowId, workflowStageId: firstStage?.id || 0 }));
+                    }}>
+                      <option value={0}>Common Kanban</option>
+                      {data.workflows.map((workflow) => <option value={workflow.id} key={workflow.id}>{workflow.name}</option>)}
+                    </select>
+                  </label>
+                  <label>Stage
+                    <select value={createForm.workflowStageId} disabled={!createForm.workflowId} onChange={(event) => setCreateForm((current) => ({ ...current, workflowStageId: Number(event.target.value) }))}>
+                      <option value={0}>{createForm.workflowId ? 'Choose stage' : 'System status'}</option>
+                      {data.stages.filter((stage) => stage.workflowId === createForm.workflowId).map((stage) => <option value={stage.id} key={stage.id}>{stage.name}</option>)}
+                    </select>
+                  </label>
+                </div>
+              )}
               <label>Deadline
                 <input type="datetime-local" value={createForm.deadline} onChange={(event) => setCreateForm((current) => ({ ...current, deadline: event.target.value }))}/>
               </label>
@@ -713,6 +896,64 @@ export function FlowluTasksBoard() {
               <button className="flowlu-create-submit" onClick={() => void createTask()} disabled={workingId === -1}>
                 <Plus size={17}/>{workingId === -1 ? 'Creating…' : 'Create Task'}
               </button>
+            </div>
+          </aside>
+        </div>
+      )}
+
+      {configOpen && (
+        <div className="flowlu-drawer-backdrop" onMouseDown={(event) => {
+          if (event.target === event.currentTarget) setConfigOpen(false);
+        }}>
+          <aside className="flowlu-config-drawer">
+            <div className="flowlu-drawer-head">
+              <div><small>Flowlu Integration</small><h2>Task Configuration</h2></div>
+              <button onClick={() => setConfigOpen(false)}><X size={20}/></button>
+            </div>
+
+            <div className="flowlu-config-status-grid">
+              <div className="good"><CheckCircle2 size={20}/><span><b>Flowlu API</b><small>Connected</small></span></div>
+              <div className={data.timerReady ? 'good' : 'warning'}>
+                {data.timerReady ? <CheckCircle2 size={20}/> : <AlertCircle size={20}/>}<span><b>Timer History</b><small>{data.timerReady ? 'Ready' : 'Setup required'}</small></span>
+              </div>
+            </div>
+
+            <div className="flowlu-config-section">
+              <h3>Flowlu Workflows</h3>
+              <p>The board reads task workflows and stages directly from Flowlu. Configure or rename them in Flowlu and refresh this page.</p>
+              <div className="flowlu-config-metrics">
+                <div><strong>{data.workflows.length}</strong><span>Workflows</span></div>
+                <div><strong>{data.stages.length}</strong><span>Stages</span></div>
+                <div><strong>{data.users.length}</strong><span>Active users</span></div>
+              </div>
+              {data.workflows.length ? (
+                <div className="flowlu-workflow-list">
+                  {data.workflows.map((workflow) => (
+                    <button key={workflow.id} onClick={() => { chooseWorkflow(workflow.id); setConfigOpen(false); }}>
+                      <span><b>{workflow.name}</b><small>{data.stages.filter((stage) => stage.workflowId === workflow.id).length} stages</small></span>
+                      <span>Use board →</span>
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <div className="flowlu-config-note">No custom task workflows were returned by the Flowlu API. The Common Kanban remains available.</div>
+              )}
+            </div>
+
+            <div className="flowlu-config-section">
+              <h3>Timer storage</h3>
+              {data.timerReady ? (
+                <div className="flowlu-config-note success">Supabase timer history is available. Start, Pause, Stop and history are enabled.</div>
+              ) : (
+                <div className="flowlu-config-note warning">Run <code>005_flowlu_task_timer_sessions.sql</code> in Supabase SQL Editor. The board works without it, but timer controls stay disabled.</div>
+              )}
+            </div>
+
+            <div className="flowlu-config-section">
+              <h3>Connection security</h3>
+              <p>Flowlu account code, API key and webhook secret are stored only as Vercel server environment variables. They are not sent to the browser.</p>
+              <div className="flowlu-config-sync"><RefreshCw size={15}/><span>Last task sync: {data.syncedAt ? new Date(data.syncedAt).toLocaleString() : 'Not synced yet'}</span></div>
+              <button className="flowlu-config-refresh" onClick={() => void load()}><RefreshCw size={16}/> Refresh configuration</button>
             </div>
           </aside>
         </div>
