@@ -67,9 +67,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (req.method === 'GET' && taskAction === 'flowlu-tasks') {
       const statusRaw = Number(req.query.status || 0);
       const responsibleId = Number(req.query.responsibleId || 0) || undefined;
+      const workflowId = Number(req.query.workflowId || 0) || undefined;
+      const workflowStageId = Number(req.query.workflowStageId || 0) || undefined;
       const result = await fetchFlowluTasks({
         search: String(req.query.search || '').trim() || undefined,
         responsibleId,
+        workflowId,
+        workflowStageId,
         status: [1, 3, 4, 5].includes(statusRaw) ? statusRaw : undefined,
         includeCompleted: String(req.query.includeCompleted || '1') !== '0',
       });
@@ -100,6 +104,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         priority: Number(body.priority || 2),
         timeEstimate: Math.max(0, Number(body.timeEstimateSeconds || 0)),
         crmCompanyId: Number(body.crmCompanyId || 0) || undefined,
+        workflowId: Number(body.workflowId || 0) || undefined,
+        workflowStageId: Number(body.workflowStageId || 0) || undefined,
       });
       return res.status(201).json({ ok: true, taskId: result.id });
     }
@@ -122,6 +128,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           ? undefined
           : Math.max(0, Number(body.timeEstimateSeconds || 0)),
         status: statusRaw as FlowluTaskStatus | undefined,
+        workflowId: body.workflowId === undefined ? undefined : Number(body.workflowId || 0) || null,
+        workflowStageId: body.workflowStageId === undefined ? undefined : Number(body.workflowStageId || 0) || null,
       });
       return res.status(200).json({ ok: true, task: result });
     }
@@ -264,8 +272,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     return res.status(405).json({ error: 'Method not allowed' });
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unable to manage campaigns or tasks.';
-    const setupMissing = /timer storage is not set up|005_flowlu_task_timer_sessions/i.test(message);
-    return res.status(setupMissing ? 503 : 500).json({ error: message });
+    return res.status(500).json({
+      error: error instanceof Error ? error.message : 'Unable to manage campaigns.',
+    });
   }
 }
