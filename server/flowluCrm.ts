@@ -290,15 +290,16 @@ export async function createFlowluFollowupTask(input: {
     throw new Error('Enter a valid follow-up date and time.');
   }
 
-  const data = await flowluPost('task/task/create', {
+  const data = await flowluPost('task/tasks/create', {
     name: String(input.name).trim(),
     responsible_id: input.responsibleId,
     created_by: input.responsibleId,
-    crm_company_id: input.accountId,
-    deadline: parsedDeadline ? parsedDeadline.toISOString().replace('T', ' ').replace('Z', '') : undefined,
+    crm_account_id: input.accountId,
+    deadline: parsedDeadline ? parsedDeadline.toISOString().slice(0, 19).replace('T', ' ') : undefined,
     description: String(input.description || '').trim() || undefined,
     archive_status: 0,
     is_repeat: 0,
+    type: 0,
   });
 
   const taskId = Number(data?.response?.id || 0);

@@ -8,12 +8,30 @@ export type FlowluTaskUser = {
   active: boolean;
 };
 
+export type FlowluTaskWorkflow = {
+  id: number;
+  name: string;
+  active: boolean;
+  sort: number;
+};
+
+export type FlowluTaskStage = {
+  id: number;
+  workflowId: number;
+  name: string;
+  systemStatus: FlowluTaskStatus;
+  active: boolean;
+  sort: number;
+};
+
 export type FlowluTask = {
   id: number;
   name: string;
   description: string;
   status: FlowluTaskStatus;
   stage: FlowluTaskStatus;
+  workflowId: number | null;
+  workflowStageId: number | null;
   priority: 1 | 2 | 3;
   responsibleId: number | null;
   responsibleName: string;
@@ -51,6 +69,8 @@ export type FlowluTaskTimerSession = {
 export type FlowluTaskBoardResponse = {
   tasks: FlowluTask[];
   users: FlowluTaskUser[];
+  workflows: FlowluTaskWorkflow[];
+  stages: FlowluTaskStage[];
   timerReady: boolean;
   sessions: FlowluTaskTimerSession[];
   totalsByTask: Record<string, number>;
@@ -79,12 +99,16 @@ export function getFlowluTasks(filters: {
   search?: string;
   responsibleId?: number;
   status?: FlowluTaskStatus;
+  workflowId?: number;
+  workflowStageId?: number;
   includeCompleted?: boolean;
 } = {}): Promise<FlowluTaskBoardResponse> {
   const params = new URLSearchParams({ action: 'flowlu-tasks' });
   if (filters.search?.trim()) params.set('search', filters.search.trim());
   if (filters.responsibleId) params.set('responsibleId', String(filters.responsibleId));
   if (filters.status) params.set('status', String(filters.status));
+  if (filters.workflowId) params.set('workflowId', String(filters.workflowId));
+  if (filters.workflowStageId) params.set('workflowStageId', String(filters.workflowStageId));
   params.set('includeCompleted', filters.includeCompleted === false ? '0' : '1');
   return json(`/api/campaigns?${params.toString()}`);
 }
@@ -97,6 +121,8 @@ export function createFlowluBoardTask(payload: {
   priority?: 1 | 2 | 3;
   timeEstimateSeconds?: number;
   crmCompanyId?: number;
+  workflowId?: number;
+  workflowStageId?: number;
 }): Promise<{ ok: true; taskId: number }> {
   return json('/api/campaigns?action=flowlu-task-board-create', {
     method: 'POST',
@@ -113,6 +139,8 @@ export function updateFlowluBoardTask(payload: {
   priority?: 1 | 2 | 3;
   timeEstimateSeconds?: number;
   status?: FlowluTaskStatus;
+  workflowId?: number | null;
+  workflowStageId?: number | null;
 }): Promise<{ ok: true; task: unknown }> {
   return json('/api/campaigns?action=flowlu-task-board-update', {
     method: 'PATCH',
