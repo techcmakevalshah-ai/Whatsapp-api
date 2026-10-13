@@ -1,6 +1,6 @@
-import { BarChart3, ContactRound, FolderOpen, LayoutDashboard, ListTodo, MessageCircle, Settings, ShieldCheck } from 'lucide-react';
+import { BarChart3, BriefcaseBusiness, ContactRound, FolderOpen, LayoutDashboard, ListTodo, MessageCircle, Settings, ShieldCheck } from 'lucide-react';
 
-export type AppPage = 'dashboard' | 'tasks' | 'whatsapp' | 'contacts' | 'users';
+export type AppPage = 'dashboard' | 'tasks' | 'crm' | 'whatsapp' | 'contacts' | 'users';
 
 export function Sidebar({
   page,
@@ -20,55 +20,35 @@ export function Sidebar({
       <div className="brand"><span className="brand-mark">◎</span><span>CMA Keval Shah</span></div>
 
       <nav>
-        <button
-          className={`nav-item nav-button ${page === 'dashboard' ? 'active' : ''}`}
-          onClick={() => onNavigate('dashboard')}
-        >
+        <button className={`nav-item nav-button ${page === 'dashboard' ? 'active' : ''}`} onClick={() => onNavigate('dashboard')}>
           <LayoutDashboard size={18}/><span>Dashboard</span>
         </button>
 
-        <button
-          className={`nav-item nav-button ${page === 'tasks' ? 'active' : ''}`}
-          onClick={() => {
-            if (page === 'tasks') return;
-            window.location.assign('/tasks');
-          }}
-        >
+        <button className={`nav-item nav-button ${page === 'tasks' ? 'active' : ''}`} onClick={() => page === 'tasks' ? undefined : window.location.assign('/tasks')}>
           <ListTodo size={18}/><span>Tasks</span>
         </button>
 
-        <button
-          className={`nav-item nav-button ${page === 'contacts' ? 'active' : ''}`}
-          onClick={() => onNavigate('contacts')}
-        >
+        <button className={`nav-item nav-button ${page === 'crm' ? 'active' : ''}`} onClick={() => page === 'crm' ? undefined : window.location.assign('/crm')}>
+          <BriefcaseBusiness size={18}/><span>CRM Opportunities</span>
+        </button>
+
+        <button className={`nav-item nav-button ${page === 'contacts' ? 'active' : ''}`} onClick={() => onNavigate('contacts')}>
           <ContactRound size={18}/><span>Contacts</span>
         </button>
 
-        <button
-          className={`nav-item nav-button ${page === 'whatsapp' ? 'active' : ''}`}
-          onClick={() => onNavigate('whatsapp')}
-        >
+        <button className={`nav-item nav-button ${page === 'whatsapp' ? 'active' : ''}`} onClick={() => onNavigate('whatsapp')}>
           <MessageCircle size={18}/><span>WhatsApp</span>
         </button>
 
         {isAdmin && (
-          <button
-            className={`nav-item nav-button ${page === 'users' ? 'active' : ''}`}
-            onClick={() => onNavigate('users')}
-          >
+          <button className={`nav-item nav-button ${page === 'users' ? 'active' : ''}`} onClick={() => onNavigate('users')}>
             <ShieldCheck size={18}/><span>Users & Access</span>
           </button>
         )}
 
-        <div className="nav-item nav-disabled" title="Coming later">
-          <FolderOpen size={18}/><span>Google Drive</span>
-        </div>
-        <div className="nav-item nav-disabled" title="Coming later">
-          <BarChart3 size={18}/><span>Analytics</span>
-        </div>
-        <div className="nav-item nav-disabled" title="Coming later">
-          <Settings size={18}/><span>Settings</span>
-        </div>
+        <div className="nav-item nav-disabled" title="Coming later"><FolderOpen size={18}/><span>Google Drive</span></div>
+        <div className="nav-item nav-disabled" title="Coming later"><BarChart3 size={18}/><span>Analytics</span></div>
+        <div className="nav-item nav-disabled" title="Coming later"><Settings size={18}/><span>Settings</span></div>
 
         {page === 'whatsapp' && (
           <>
