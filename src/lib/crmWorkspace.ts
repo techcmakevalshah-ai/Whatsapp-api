@@ -22,6 +22,8 @@ export type CrmOpportunityDetail = {
   lossReasons: FlowluLossReason[];
 };
 
+let latestMeta: FlowluSalesMeta | null = null;
+
 async function crmJson<T>(url: string, init?: RequestInit): Promise<T> {
   const headers = new Headers(init?.headers);
   if (!headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
@@ -36,11 +38,13 @@ async function crmJson<T>(url: string, init?: RequestInit): Promise<T> {
   return body as T;
 }
 
-export function getCrmWorkspaceMeta() {
-  return crmJson<FlowluSalesMeta>('/api/contacts?action=flowlu-meta');
+export async function getCrmWorkspaceMeta() {
+  const meta = await crmJson<FlowluSalesMeta>('/api/contacts?action=flowlu-meta');
+  latestMeta = meta;
+  return meta;
 }
 
-export function getCrmOpportunityBoard(filters: {
+export async function getCrmOpportunityBoard(filters: {
   pipelineId: number;
   assigneeId?: number;
   sourceId?: number;
@@ -54,7 +58,16 @@ export function getCrmOpportunityBoard(filters: {
   if (filters.assigneeId) params.set('assigneeId', String(filters.assigneeId));
   if (filters.sourceId) params.set('sourceId', String(filters.sourceId));
 
-  return crmJson<{ contexts: FlowluLeadContext[]; leadCount: number; stages: FlowluOption[] }>(`/api/contacts?${params.toString()}`);
+  const data = await crmJson<{ contexts: FlowluLeadContext[]; leadCount: number; stages: FlowluOption[] }>(`/api/contacts?${params.toString()}`);
+
+  if (latestMeta && Array.isArray(data.stages) && data.stages.length) {
+    latestMeta.stages = [
+      ...latestMeta.stages.filter((stage) => stage.pipelineId !== filters.pipelineId),
+      ...data.stages,
+    ];
+  }
+
+  return data;
 }
 
 export function getCrmOpportunityDetail(id: number) {
