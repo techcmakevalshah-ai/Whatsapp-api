@@ -1,4 +1,5 @@
 import { flowluGet, flowluPost } from './flowluContacts.js';
+import { invalidateFlowluOpportunityWorkspaceCache } from './flowluOpportunityWorkspace.js';
 
 export type FlowluOpportunityControl = {
   id: number;
@@ -174,10 +175,14 @@ export async function updateFlowluOpportunity(input: {
 
   const data = await flowluPost('crm/lead/update/' + input.id, payload);
   const mapped = mapOpportunity(data?.response);
-  if (mapped) return mapped;
+  if (mapped) {
+    invalidateFlowluOpportunityWorkspaceCache(mapped.pipelineId || input.pipelineId || undefined);
+    return mapped;
+  }
 
   const refreshed = await flowluGet('crm/lead/get/' + input.id);
   const fallback = mapOpportunity(refreshed?.response);
   if (!fallback) throw new Error('Flowlu updated the opportunity but did not return the updated record.');
+  invalidateFlowluOpportunityWorkspaceCache(fallback.pipelineId || input.pipelineId || undefined);
   return fallback;
 }
