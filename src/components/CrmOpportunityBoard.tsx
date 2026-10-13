@@ -29,8 +29,16 @@ import {
 } from '../lib/crmWorkspace';
 import type { FlowluLeadContext, FlowluOption, FlowluSalesMeta } from '../types';
 import './CrmOpportunityBoard.css';
+import './CrmOpportunityBoardRefine.css';
 
 type DealFilter = 'in_progress' | 'won' | 'lost' | 'all';
+type OpportunityCardContext = FlowluLeadContext & {
+  accountName?: string;
+  accountPhone?: string;
+  startDate?: string;
+  deadline?: string;
+  commentCount?: number;
+};
 
 const DEFAULT_STAGE_COLORS = ['#2f9be0', '#9b59c5', '#f0b91c', '#ea8a2d', '#20b7c7', '#23a55a'];
 
@@ -43,6 +51,13 @@ function dateOnly(value: string) {
   const date = new Date(value.includes('T') ? value : value.replace(' ', 'T'));
   if (Number.isNaN(date.getTime())) return value;
   return date.toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' });
+}
+
+function cardDate(value?: string) {
+  if (!value) return '—';
+  const date = new Date(value.includes('T') ? value : value.replace(' ', 'T'));
+  if (Number.isNaN(date.getTime())) return value.slice(0, 10);
+  return date.toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit' });
 }
 
 function commentTime(value: string) {
@@ -59,7 +74,7 @@ function initials(value: string) {
 export function CrmOpportunityBoard() {
   const [meta, setMeta] = useState<FlowluSalesMeta | null>(null);
   const [pipelineId, setPipelineId] = useState(0);
-  const [contexts, setContexts] = useState<FlowluLeadContext[]>([]);
+  const [contexts, setContexts] = useState<OpportunityCardContext[]>([]);
   const [dealFilter, setDealFilter] = useState<DealFilter>('in_progress');
   const [assigneeId, setAssigneeId] = useState(0);
   const [sourceId, setSourceId] = useState(0);
@@ -84,7 +99,7 @@ export function CrmOpportunityBoard() {
   const [accountResults, setAccountResults] = useState<CrmAccountOption[]>([]);
   const [accountSearching, setAccountSearching] = useState(false);
 
-  const [selected, setSelected] = useState<FlowluLeadContext | null>(null);
+  const [selected, setSelected] = useState<OpportunityCardContext | null>(null);
   const [detail, setDetail] = useState<CrmOpportunityDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailSaving, setDetailSaving] = useState(false);
@@ -139,7 +154,7 @@ export function CrmOpportunityBoard() {
         sourceId: sourceId || undefined,
         dealStatus: dealFilter,
       });
-      setContexts(data.contexts || []);
+      setContexts((data.contexts || []) as OpportunityCardContext[]);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unable to load opportunities.');
     } finally {
@@ -154,8 +169,6 @@ export function CrmOpportunityBoard() {
     const direct = allStages.filter((stage) => stage.pipelineId === pipelineId);
     if (direct.length) return direct;
 
-    // Some Flowlu accounts return stage metadata without pipeline_id. When that
-    // happens, recover the stage headings from the stage IDs on the actual cards.
     const usedIds = [...new Set(contexts.map((item) => item.stageId).filter((id): id is number => Boolean(id)))];
     const recovered = allStages.filter((stage) => usedIds.includes(stage.id));
     if (recovered.length) return recovered;
@@ -165,7 +178,7 @@ export function CrmOpportunityBoard() {
 
   const visible = useMemo(() => {
     const search = query.trim().toLowerCase();
-    return contexts.filter((item) => !search || `${item.leadName} ${item.leadId}`.toLowerCase().includes(search));
+    return contexts.filter((item) => !search || `${item.leadName} ${item.accountName || ''} ${item.accountPhone || ''} ${item.leadId}`.toLowerCase().includes(search));
   }, [contexts, query]);
 
   useEffect(() => {
@@ -250,7 +263,7 @@ export function CrmOpportunityBoard() {
     }
   };
 
-  const loadDetail = async (item: FlowluLeadContext) => {
+  const loadDetail = async (item: OpportunityCardContext) => {
     setSelected(item);
     setDetail(null);
     setDetailLoading(true);
@@ -352,6 +365,7 @@ export function CrmOpportunityBoard() {
       await createCrmOpportunityComment(selected.leadId, commentText.trim());
       setCommentText('');
       await refreshDetail();
+      await refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unable to add comment.');
     } finally {
@@ -413,7 +427,7 @@ export function CrmOpportunityBoard() {
                 <div className="crm-v3-column-list">
                   {cards.map((item) => {
                     const owner = meta?.users.find((user) => user.id === item.assigneeId)?.name || 'Unassigned';
-                    const source = meta?.sources.find((src) => src.id === item.sourceId)?.name || '';
+                    const contactName = item.accountName || (item.accountId > 0 ? `Contact #${item.accountId}` : '');
                     return (
                       <article
                         key={item.leadId}
@@ -423,10 +437,21 @@ export function CrmOpportunityBoard() {
                         onDragEnd={() => { setDraggingId(null); setDropStageId(null); }}
                         onClick={() => { if (!draggingId) void loadDetail(item); }}
                       >
-                        <div className="crm-v3-card-top"><strong>{item.leadName}</strong><span>#{item.leadId}</span></div>
-                        <b className="budget">₹{money(item.budget)}</b>
-                        <div className="crm-v3-card-meta"><span><UserRound size={12}/>{owner}</span>{source && <span>{source}</span>}</div>
-                        <div className="crm-v3-card-foot"><small className={`deal-status ${item.status}`}>{item.status === 'in_progress' ? 'Active' : item.status === 'won' ? 'Won' : 'Lost'}</small>{item.accountId > 0 && <span>Contact #{item.accountId}</span>}</div>
+                        <div className="crm-v3-card-top">
+                          <strong>{item.leadName}</strong>
+                          {item.status !== 'in_progress' && <small className={`deal-status ${item.status}`}>{item.status === 'won' ? 'Won' : 'Lost'}</small>}
+                        </div>
+                        {contactName && <div className="crm-card-contact" title={item.accountPhone || contactName}>{contactName}</div>}
+                        {Number(item.budget || 0) > 0 && <b className="budget">₹{money(item.budget)}</b>}
+                        <div className="crm-card-bottom">
+                          <span className="crm-card-owner" title={owner}>{initials(owner)}</span>
+                          <div className="crm-card-dates">
+                            <span><small>Start</small><b>{cardDate(item.startDate)}</b></span>
+                            <i>›</i>
+                            <span><small>End Date</small><b>{cardDate(item.deadline)}</b></span>
+                          </div>
+                          <span className={`crm-card-comments ${item.commentCount ? 'has-comments' : ''}`} title="Team comments"><MessageSquare size={14}/>{item.commentCount ? item.commentCount : ''}</span>
+                        </div>
                       </article>
                     );
                   })}
