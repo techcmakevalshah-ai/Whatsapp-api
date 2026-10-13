@@ -42,8 +42,23 @@ function dealStatusActive(status?: string) {
 }
 
 async function list(path: string, limit = 200) {
-  const data = await flowluGet(path, { page: 1, limit });
-  return Array.isArray(data?.response?.items) ? data.response.items : [];
+  const output: any[] = [];
+  let rowsSeen = 0;
+
+  for (let page = 1; page <= 25; page += 1) {
+    const data = await flowluGet(path, { page, limit });
+    const response = data?.response || {};
+    const items = Array.isArray(response?.items) ? response.items : [];
+    if (!items.length) break;
+
+    output.push(...items);
+    rowsSeen += items.length;
+
+    const total = Number(response?.total || 0);
+    if ((total > 0 && rowsSeen >= total) || items.length < limit) break;
+  }
+
+  return output;
 }
 
 export async function getFlowluSalesMeta() {
@@ -263,7 +278,7 @@ function escapeHtml(value: string) {
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
+    .replace(/\"/g, '&quot;')
     .replace(/'/g, '&#039;');
 }
 
