@@ -24,9 +24,18 @@ import {
   getFlowluSalesMeta,
 } from '../server/flowluCrm.js';
 import {
+  fetchFlowluLossReasons,
   fetchFlowluOpportunitiesForContact,
   updateFlowluOpportunity,
 } from '../server/flowluOpportunityControl.js';
+import {
+  createFlowluOpportunityComment,
+  createFlowluPipelineStage,
+  createFlowluWorkspaceOpportunity,
+  getFlowluOpportunityDetail,
+  getFlowluOpportunityWorkspace,
+  searchFlowluAccounts,
+} from '../server/flowluOpportunityWorkspace.js';
 
 function extractFlowluWebhookId(body: any) {
   const candidates = [
@@ -163,6 +172,40 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(200).json(meta);
     }
 
+    if (req.method === 'GET' && action === 'flowlu-opportunity-board') {
+      const pipelineId = Number(req.query.pipelineId || 0);
+      const assigneeId = Number(req.query.assigneeId || 0) || undefined;
+      const sourceId = Number(req.query.sourceId || 0) || undefined;
+      const dealStatusRaw = String(req.query.dealStatus || 'all');
+      const dealStatus = ['in_progress', 'won', 'lost'].includes(dealStatusRaw)
+        ? dealStatusRaw as 'in_progress' | 'won' | 'lost'
+        : 'all';
+      const result = await getFlowluOpportunityWorkspace({
+        pipelineId,
+        assigneeId,
+        sourceId,
+        dealStatus,
+      });
+      res.setHeader('Cache-Control', 'no-store');
+      return res.status(200).json(result);
+    }
+
+    if (req.method === 'GET' && action === 'flowlu-opportunity-detail') {
+      const leadId = Number(req.query.id || 0);
+      const [detail, lossReasons] = await Promise.all([
+        getFlowluOpportunityDetail(leadId),
+        fetchFlowluLossReasons(),
+      ]);
+      res.setHeader('Cache-Control', 'no-store');
+      return res.status(200).json({ ...detail, lossReasons });
+    }
+
+    if (req.method === 'GET' && action === 'flowlu-account-search') {
+      const accounts = await searchFlowluAccounts(String(req.query.search || ''));
+      res.setHeader('Cache-Control', 'no-store');
+      return res.status(200).json({ accounts });
+    }
+
     if (req.method === 'GET' && action === 'flowlu-opportunity-audience') {
       const pipelineId = Number(req.query.pipelineId || 0) || undefined;
       const stageId = Number(req.query.stageId || 0) || undefined;
@@ -223,6 +266,39 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         closingComment: body.closingComment === undefined ? undefined : String(body.closingComment),
       });
       return res.status(200).json({ ok: true, opportunity });
+    }
+
+    if (req.method === 'POST' && action === 'flowlu-opportunity-stage-create') {
+      const body = req.body || {};
+      const stage = await createFlowluPipelineStage({
+        pipelineId: Number(body.pipelineId || 0),
+        name: String(body.name || ''),
+        color: body.color ? String(body.color) : undefined,
+      });
+      return res.status(201).json({ ok: true, stage });
+    }
+
+    if (req.method === 'POST' && action === 'flowlu-opportunity-board-create') {
+      const body = req.body || {};
+      const result = await createFlowluWorkspaceOpportunity({
+        name: String(body.name || ''),
+        pipelineId: Number(body.pipelineId || 0),
+        stageId: Number(body.stageId || 0) || undefined,
+        budget: body.budget === '' || body.budget == null ? undefined : Number(body.budget),
+        assigneeId: Number(body.assigneeId || 0) || undefined,
+        sourceId: Number(body.sourceId || 0) || undefined,
+        accountId: Number(body.accountId || 0) || undefined,
+      });
+      return res.status(201).json({ ok: true, opportunityId: result.id });
+    }
+
+    if (req.method === 'POST' && action === 'flowlu-opportunity-comment') {
+      const body = req.body || {};
+      const result = await createFlowluOpportunityComment({
+        leadId: Number(body.leadId || 0),
+        text: String(body.text || ''),
+      });
+      return res.status(201).json({ ok: true, commentId: result.id });
     }
 
     if (req.method === 'GET' && action === 'flowlu-categories') {
