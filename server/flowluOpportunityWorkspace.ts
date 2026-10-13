@@ -1,4 +1,5 @@
 import { flowluGet, flowluPost } from './flowluContacts.js';
+import { readFlowluContactCache } from './flowluCache.js';
 
 export type WorkspaceDealStatus = 'in_progress' | 'won' | 'lost';
 
@@ -10,6 +11,38 @@ export type WorkspacePipelineStage = {
   color: string | null;
   active: boolean;
 };
+
+type WorkspaceBoardResult = {
+  contexts: Array<{
+    accountId: number;
+    leadId: number;
+    leadName: string;
+    pipelineId: number | null;
+    stageId: number | null;
+    budget: number;
+    assigneeId: number | null;
+    sourceId: number | null;
+    status: WorkspaceDealStatus;
+    startDate: string;
+    deadline: string;
+    accountName: string;
+    accountPhone: string;
+    commentCount: number;
+  }>;
+  leadCount: number;
+  stages: WorkspacePipelineStage[];
+  cached?: boolean;
+  stale?: boolean;
+  fetchedAt?: string;
+};
+
+const BOARD_FRESH_MS = 45 * 1000;
+const BOARD_STALE_MS = 10 * 60 * 1000;
+const STAGE_CACHE_MS = 10 * 60 * 1000;
+
+const boardCache = new Map<string, { freshUntil: number; staleUntil: number; value: WorkspaceBoardResult }>();
+const boardInFlight = new Map<string, Promise<WorkspaceBoardResult>>();
+const stageCache = new Map<number, { expiresAt: number; value: WorkspacePipelineStage[] }>();
 
 function dealStatus(value: unknown): WorkspaceDealStatus {
   const active = Number(value || 1);
@@ -59,18 +92,6 @@ function chunk<T>(items: T[], size: number) {
   return output;
 }
 
-async function mapWithConcurrency<T>(items: T[], concurrency: number, worker: (item: T) => Promise<void>) {
-  let cursor = 0;
-  const runners = Array.from({ length: Math.min(concurrency, items.length) }, async () => {
-    while (cursor < items.length) {
-      const index = cursor;
-      cursor += 1;
-      await worker(items[index]);
-    }
-  });
-  await Promise.all(runners);
-}
-
 function normalizeStage(row: any, pipelineId: number): WorkspacePipelineStage | null {
   const id = Number(row?.id || 0);
   const name = String(row?.name || '').trim();
@@ -80,67 +101,82 @@ function normalizeStage(row: any, pipelineId: number): WorkspacePipelineStage | 
     id,
     name,
     pipelineId: rowPipelineId,
-    ordering: Number(row?.ordering || 0),
+    ordering: Number(row?.ordering ?? row?.sort ?? row?.position ?? 0),
     color: String(row?.color || '').trim() || null,
     active: true,
   };
 }
 
-async function fetchPipelineStages(pipelineId: number, usedStageIds: number[]) {
-  const byId = new Map<number, WorkspacePipelineStage>();
-  let rowsSeen = 0;
-
-  try {
-    for (let page = 1; page <= 10; page += 1) {
-      const data = await flowluGet('crm/pipeline_stage/list', {
-        page,
-        limit: 200,
-        'filter[pipeline_id]': pipelineId,
-      });
-      const response = data?.response || {};
-      const rows = Array.isArray(response?.items) ? response.items : [];
-      if (!rows.length) break;
-
-      for (const row of rows) {
-        const stage = normalizeStage(row, pipelineId);
-        if (stage) byId.set(stage.id, stage);
-      }
-
-      rowsSeen += rows.length;
-      const total = Number(response?.total || 0);
-      if ((total > 0 && rowsSeen >= total) || rows.length < 200) break;
-    }
-  } catch {
-    // The per-stage fallback below still resolves stages that currently contain cards.
-  }
-
-  const missingIds = usedStageIds.filter((id) => id > 0 && !byId.has(id));
-  await mapWithConcurrency(missingIds, 6, async (stageId) => {
-    try {
-      const data = await flowluGet('crm/pipeline_stage/get/' + stageId);
-      const stage = normalizeStage(data?.response || {}, pipelineId);
-      if (stage) byId.set(stage.id, stage);
-    } catch {
-      // Do not invent a stage name if Flowlu cannot resolve the record.
-    }
-  });
-
-  return [...byId.values()].sort((a, b) => {
-    if (a.ordering !== b.ordering) return a.ordering - b.ordering;
-    return a.id - b.id;
-  });
-}
-
-export async function getFlowluOpportunityWorkspace(input: {
+function boardKey(input: {
   pipelineId: number;
   assigneeId?: number;
   sourceId?: number;
   dealStatus?: 'all' | WorkspaceDealStatus;
 }) {
-  if (!Number.isFinite(input.pipelineId) || input.pipelineId <= 0) throw new Error('Choose a Flowlu pipeline.');
+  return [
+    input.pipelineId,
+    input.assigneeId || 0,
+    input.sourceId || 0,
+    input.dealStatus || 'all',
+  ].join(':');
+}
 
+export function invalidateFlowluOpportunityWorkspaceCache(pipelineId?: number) {
+  if (!pipelineId) {
+    boardCache.clear();
+    stageCache.clear();
+    return;
+  }
+  stageCache.delete(pipelineId);
+  for (const key of [...boardCache.keys()]) {
+    if (key.startsWith(String(pipelineId) + ':')) boardCache.delete(key);
+  }
+}
+
+async function fetchPipelineStages(pipelineId: number) {
+  const cached = stageCache.get(pipelineId);
+  if (cached && cached.expiresAt > Date.now()) return cached.value;
+
+  const byId = new Map<number, WorkspacePipelineStage>();
+  let rowsSeen = 0;
+
+  for (let page = 1; page <= 10; page += 1) {
+    const data = await flowluGet('crm/pipeline_stage/list', {
+      page,
+      limit: 200,
+      'filter[pipeline_id]': pipelineId,
+    });
+    const response = data?.response || {};
+    const rows = Array.isArray(response?.items) ? response.items : [];
+    if (!rows.length) break;
+
+    for (const row of rows) {
+      const stage = normalizeStage(row, pipelineId);
+      if (stage) byId.set(stage.id, stage);
+    }
+
+    rowsSeen += rows.length;
+    const total = Number(response?.total || 0);
+    if ((total > 0 && rowsSeen >= total) || rows.length < 200) break;
+  }
+
+  const stages = [...byId.values()].sort((a, b) => {
+    if (a.ordering !== b.ordering) return a.ordering - b.ordering;
+    return a.id - b.id;
+  });
+  stageCache.set(pipelineId, { expiresAt: Date.now() + STAGE_CACHE_MS, value: stages });
+  return stages;
+}
+
+async function buildFlowluOpportunityWorkspace(input: {
+  pipelineId: number;
+  assigneeId?: number;
+  sourceId?: number;
+  dealStatus?: 'all' | WorkspaceDealStatus;
+}): Promise<WorkspaceBoardResult> {
   const leadsById = new Map<number, any>();
   let rowsSeen = 0;
+
   for (let page = 1; page <= 25; page += 1) {
     const query: Record<string, string | number> = {
       page,
@@ -172,107 +208,124 @@ export async function getFlowluOpportunityWorkspace(input: {
   }
 
   const leads = [...leadsById.values()];
-  const leadIds = [...leadsById.keys()];
   const accountByLead = new Map<number, number>();
+  const relationNameByLead = new Map<number, string>();
+  const relationPhoneByLead = new Map<number, string>();
 
   for (const row of leads) {
     const leadId = Number(row?.id || 0);
-    const directAccountId = Number(row?.contact_id || row?.company_id || 0);
+    const directAccountId = Number(row?.contact_id || row?.account_id || row?.company_id || 0);
     if (leadId && directAccountId) accountByLead.set(leadId, directAccountId);
   }
 
-  const leadsNeedingRelation = leadIds.filter((leadId) => !accountByLead.has(leadId));
+  const leadsNeedingRelation = [...leadsById.keys()].filter((leadId) => !accountByLead.has(leadId));
   for (const batch of chunk(leadsNeedingRelation, 75)) {
-    let relationRowsSeen = 0;
-    for (let page = 1; page <= 20; page += 1) {
-      const data = await flowluGet('crm/lead_accounts/list', {
-        page,
-        limit: 200,
-        'filter[lead_id]': batch.join(','),
-        'filter[account_type]': 2,
-      });
-      const response = data?.response || {};
-      const relations = Array.isArray(response?.items) ? response.items : [];
-      if (!relations.length) break;
-      for (const relation of relations) {
-        const leadId = Number(relation?.lead_id || 0);
-        const accountId = Number(relation?.account_id || 0);
-        if (leadId && accountId && leadsById.has(leadId) && !accountByLead.has(leadId)) accountByLead.set(leadId, accountId);
-      }
-      relationRowsSeen += relations.length;
-      const total = Number(response?.total || 0);
-      if ((total > 0 && relationRowsSeen >= total) || relations.length < 200) break;
+    const data = await flowluGet('crm/lead_accounts/list', {
+      page: 1,
+      limit: 200,
+      'filter[lead_id]': batch.join(','),
+      'filter[account_type]': 2,
+    });
+    const relations = Array.isArray(data?.response?.items) ? data.response.items : [];
+    for (const relation of relations) {
+      const leadId = Number(relation?.lead_id || 0);
+      const accountId = Number(relation?.account_id || 0);
+      if (!leadId || !accountId || !leadsById.has(leadId) || accountByLead.has(leadId)) continue;
+      accountByLead.set(leadId, accountId);
+      const name = String(relation?.account_name || relation?.name || relation?.contact_name || '').trim();
+      const phone = String(relation?.phone || relation?.mobile || '').trim();
+      if (name) relationNameByLead.set(leadId, name);
+      if (phone) relationPhoneByLead.set(leadId, phone);
     }
   }
 
-  const baseContexts = leads.map((row) => ({
-    accountId: accountByLead.get(Number(row?.id || 0)) || 0,
-    directAccountName: String(row?.contact_name || row?.contact_company || '').trim(),
-    directAccountPhone: String(row?.contact_mobile || row?.contact_phone || '').trim(),
-    leadId: Number(row?.id || 0),
-    leadName: String(row?.name || 'Opportunity').trim() || 'Opportunity',
-    pipelineId: Number(row?.pipeline_id || 0) || null,
-    stageId: Number(row?.pipeline_stage_id || 0) || null,
-    budget: Number(row?.budget || 0),
-    assigneeId: Number(row?.assignee_id || 0) || null,
-    sourceId: Number(row?.source_id || 0) || null,
-    status: dealStatus(row?.active),
-    startDate: String(row?.start_date || row?.created || '').trim(),
-    deadline: String(row?.deadline || '').trim(),
-  })).filter((item) => item.leadId > 0);
-
-  const accountInfo = new Map<number, { name: string; phone: string }>();
-  const accountIds = [...new Set(baseContexts.map((item) => item.accountId).filter((id) => id > 0))];
-  await mapWithConcurrency(accountIds, 8, async (accountId) => {
-    try {
-      const data = await flowluGet('crm/account/get/' + accountId);
-      const row = data?.response || {};
-      const name = String(row?.name || '').trim() || [row?.first_name, row?.last_name]
-        .map((part) => String(part || '').trim())
-        .filter(Boolean)
-        .join(' ');
-      const phone = String(row?.phone || row?.phone_work || row?.phone_mobile || '').trim();
-      accountInfo.set(accountId, { name: name || `Contact #${accountId}`, phone });
-    } catch {
-      accountInfo.set(accountId, { name: `Contact #${accountId}`, phone: '' });
+  const cachedContactById = new Map<number, { name: string; phone: string }>();
+  try {
+    const cachedContacts = await readFlowluContactCache();
+    for (const contact of cachedContacts?.contacts || []) {
+      cachedContactById.set(contact.flowluId, { name: contact.name, phone: contact.phone });
     }
-  });
+  } catch {
+    // CRM board must stay usable even when the local contact cache is unavailable.
+  }
 
-  const commentCountByLead = new Map<number, number>();
-  const countableLeads = baseContexts.slice(0, 80).map((item) => item.leadId);
-  await mapWithConcurrency(countableLeads, 8, async (leadId) => {
-    try {
-      const data = await flowluGet('crm/lead/' + leadId + '/comments/list', { page: 1, limit: 1 });
-      const response = data?.response || {};
-      const items = Array.isArray(response?.items) ? response.items : [];
-      const total = Number(response?.total || 0);
-      commentCountByLead.set(leadId, total > 0 ? total : items.length);
-    } catch {
-      commentCountByLead.set(leadId, 0);
-    }
-  });
+  const contexts = leads.map((row) => {
+    const leadId = Number(row?.id || 0);
+    const accountId = accountByLead.get(leadId) || 0;
+    const cachedContact = accountId ? cachedContactById.get(accountId) : undefined;
+    const directName = String(
+      row?.contact_name || row?.account_name || row?.client_name || row?.company_name || row?.contact_company || '',
+    ).trim();
+    const directPhone = String(
+      row?.contact_mobile || row?.contact_phone || row?.phone || row?.mobile || '',
+    ).trim();
 
-  const contexts = baseContexts.map((item) => ({
-    accountId: item.accountId,
-    leadId: item.leadId,
-    leadName: item.leadName,
-    pipelineId: item.pipelineId,
-    stageId: item.stageId,
-    budget: item.budget,
-    assigneeId: item.assigneeId,
-    sourceId: item.sourceId,
-    status: item.status,
-    startDate: item.startDate,
-    deadline: item.deadline,
-    accountName: item.directAccountName || (item.accountId ? accountInfo.get(item.accountId)?.name || `Contact #${item.accountId}` : ''),
-    accountPhone: item.directAccountPhone || (item.accountId ? accountInfo.get(item.accountId)?.phone || '' : ''),
-    commentCount: commentCountByLead.get(item.leadId) || 0,
-  }));
+    return {
+      accountId,
+      leadId,
+      leadName: String(row?.name || 'Opportunity').trim() || 'Opportunity',
+      pipelineId: Number(row?.pipeline_id || 0) || null,
+      stageId: Number(row?.pipeline_stage_id || 0) || null,
+      budget: Number(row?.budget || 0),
+      assigneeId: Number(row?.assignee_id || 0) || null,
+      sourceId: Number(row?.source_id || 0) || null,
+      status: dealStatus(row?.active),
+      startDate: String(row?.start_date || row?.created || '').trim(),
+      deadline: String(row?.deadline || '').trim(),
+      accountName: directName || relationNameByLead.get(leadId) || cachedContact?.name || (accountId ? `Contact #${accountId}` : ''),
+      accountPhone: directPhone || relationPhoneByLead.get(leadId) || cachedContact?.phone || '',
+      commentCount: Number(row?.comments_count || row?.comment_count || row?.comments_total || 0) || 0,
+    };
+  }).filter((item) => item.leadId > 0);
 
-  const usedStageIds = [...new Set(contexts.map((item) => item.stageId).filter((id): id is number => Boolean(id)))];
-  const stages = await fetchPipelineStages(input.pipelineId, usedStageIds);
+  const stages = await fetchPipelineStages(input.pipelineId);
+  return {
+    contexts,
+    leadCount: contexts.length,
+    stages,
+    fetchedAt: new Date().toISOString(),
+  };
+}
 
-  return { contexts, leadCount: contexts.length, stages };
+export async function getFlowluOpportunityWorkspace(input: {
+  pipelineId: number;
+  assigneeId?: number;
+  sourceId?: number;
+  dealStatus?: 'all' | WorkspaceDealStatus;
+  force?: boolean;
+}) {
+  if (!Number.isFinite(input.pipelineId) || input.pipelineId <= 0) throw new Error('Choose a Flowlu pipeline.');
+
+  const key = boardKey(input);
+  const cached = boardCache.get(key);
+  if (!input.force && cached && cached.freshUntil > Date.now()) {
+    return { ...cached.value, cached: true, stale: false };
+  }
+
+  const running = boardInFlight.get(key);
+  if (running) return running;
+
+  const task = buildFlowluOpportunityWorkspace(input)
+    .then((value) => {
+      const now = Date.now();
+      boardCache.set(key, {
+        freshUntil: now + BOARD_FRESH_MS,
+        staleUntil: now + BOARD_STALE_MS,
+        value,
+      });
+      return value;
+    })
+    .catch((error) => {
+      const stale = boardCache.get(key);
+      if (stale && stale.staleUntil > Date.now()) {
+        return { ...stale.value, cached: true, stale: true };
+      }
+      throw error;
+    })
+    .finally(() => boardInFlight.delete(key));
+
+  boardInFlight.set(key, task);
+  return task;
 }
 
 export async function createFlowluPipelineStage(input: {
@@ -293,6 +346,7 @@ export async function createFlowluPipelineStage(input: {
   });
   const id = Number(data?.response?.id || 0);
   if (!id) throw new Error('Flowlu did not return the new stage id.');
+  invalidateFlowluOpportunityWorkspaceCache(input.pipelineId);
   return { id, name, color: color || null };
 }
 
@@ -329,6 +383,7 @@ export async function createFlowluWorkspaceOpportunity(input: {
     });
   }
 
+  invalidateFlowluOpportunityWorkspaceCache(input.pipelineId);
   return { id: leadId };
 }
 
@@ -355,22 +410,34 @@ export async function getFlowluOpportunityDetail(leadId: number) {
   ]);
 
   const lead = leadData?.response || {};
-  const directAccountId = Number(lead?.contact_id || lead?.company_id || 0);
   const relations = Array.isArray(relationData?.response?.items) ? relationData.response.items : [];
-  const accountId = directAccountId || Number(relations[0]?.account_id || 0);
+  const accountId = Number(relations[0]?.account_id || lead?.contact_id || lead?.account_id || 0);
   let account: any = null;
+
   if (accountId) {
     try {
-      const accountData = await flowluGet('crm/account/get/' + accountId);
-      const row = accountData?.response || {};
-      account = {
-        id: accountId,
-        name: String(row?.name || '').trim() || [row?.first_name, row?.last_name].map((part) => String(part || '').trim()).filter(Boolean).join(' '),
-        phone: String(row?.phone || row?.phone_work || row?.phone_mobile || '').trim(),
-        email: String(row?.email || '').trim(),
-      };
+      const cachedContacts = await readFlowluContactCache();
+      const cached = cachedContacts?.contacts.find((item) => item.flowluId === accountId);
+      if (cached) {
+        account = { id: accountId, name: cached.name, phone: cached.phone, email: cached.email || '' };
+      }
     } catch {
-      account = { id: accountId, name: String(lead?.contact_name || lead?.contact_company || 'Linked contact').trim(), phone: '', email: '' };
+      // Continue with the direct Flowlu fallback below.
+    }
+
+    if (!account) {
+      try {
+        const accountData = await flowluGet('crm/account/get/' + accountId);
+        const row = accountData?.response || {};
+        account = {
+          id: accountId,
+          name: String(row?.name || '').trim() || [row?.first_name, row?.last_name].map((part) => String(part || '').trim()).filter(Boolean).join(' '),
+          phone: String(row?.phone || row?.phone_work || row?.phone_mobile || '').trim(),
+          email: String(row?.email || '').trim(),
+        };
+      } catch {
+        account = { id: accountId, name: 'Linked contact', phone: '', email: '' };
+      }
     }
   }
 
@@ -410,5 +477,6 @@ export async function createFlowluOpportunityComment(input: { leadId: number; te
   const data = await flowluPost('crm/lead/' + input.leadId + '/comments/create', {
     text: '<p>' + escapeHtml(text) + '</p>',
   });
+  invalidateFlowluOpportunityWorkspaceCache();
   return { id: Number(data?.response?.id || 0) || null };
 }
