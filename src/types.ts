@@ -115,41 +115,136 @@ export type CampaignSummary = {
   cancelledCount?: number;
 };
 
-export type CampaignRecipient = {
+export type ManagedWhatsAppTemplate = {
   id: string;
-  campaignId: string;
-  contactId: string;
-  contactName: string;
-  phone: string;
-  status: RecipientStatus['status'];
-  sentAt?: string | null;
-  deliveredAt?: string | null;
-  readAt?: string | null;
-  error?: string | null;
+  providerTemplateId?: string | null;
+  name: string;
+  language: string;
+  category: 'MARKETING' | 'UTILITY' | 'AUTHENTICATION' | string;
+  body: string;
+  footer?: string | null;
+  status: 'DRAFT' | 'APPROVED' | 'SUBMITTED' | 'PENDING' | 'REJECTED' | 'PAUSED' | 'DISABLED' | string;
+  variables: number;
+  headerType?: 'IMAGE' | 'VIDEO' | null;
+  folderId?: string | null;
+  createdAt: string;
+  updatedAt: string;
 };
 
-export type CampaignDetail = {
-  campaign: CampaignSummary;
-  recipients: CampaignRecipient[];
-};
-
-export type CampaignSettings = {
+export type RecurringCampaignSummary = {
   id: string;
-  campaignId: string;
+  name: string;
+  templateName: string;
+  status: 'active' | 'paused' | 'completed' | 'canceled' | string;
   timezone: string;
-  dailySendTime: string;
-  intervalDays: number;
-  startDate: string;
-  endDate?: string | null;
-  maxRecipientsPerBatch?: number | null;
+  startAt: string;
+  nextRunAt?: string | null;
+  totalDays: number;
+  runsCreated: number;
+  lastRunAt?: string | null;
+  schedulerError?: string | null;
+  createdAt: string;
+  totalRecipients: number;
 };
 
-export type StaffRole = 'admin' | 'team';
+export type MessageSeriesStep = {
+  id?: string;
+  dayNumber: number;
+  templateName: string;
+  templateLanguage: string;
+  headerType?: 'IMAGE' | 'VIDEO' | null;
+  mediaUrl?: string | null;
+  variableValues: Record<string, string>;
+  sendTime?: string | null;
+};
+
+export type MessageSeries = {
+  id: string;
+  name: string;
+  description?: string | null;
+  status: 'READY' | 'INACTIVE' | string;
+  createdAt: string;
+  updatedAt: string;
+  steps: MessageSeriesStep[];
+};
+
+export type MessageSeriesScheduleSummary = {
+  id: string;
+  seriesId: string;
+  seriesName: string;
+  name: string;
+  status: 'active' | 'paused' | 'completed' | 'canceled' | string;
+  timezone: string;
+  startAt: string;
+  nextRunAt?: string | null;
+  totalDays: number;
+  runsCreated: number;
+  lastRunAt?: string | null;
+  schedulerError?: string | null;
+  createdAt: string;
+  totalRecipients: number;
+};
+
+export type TemplateFolder = {
+  id: string;
+  name: string;
+  description?: string | null;
+  active: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
 
 export type StaffProfile = {
   id: string;
   email: string;
   fullName: string;
-  role: StaffRole;
+  role: 'admin' | 'staff';
   mustSetPassword: boolean;
+};
+
+export type StaffUserProfile = StaffProfile & {
+  active: boolean;
+  revokedAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  emailConfirmedAt?: string | null;
+  invitedAt?: string | null;
+  lastSignInAt?: string | null;
+  authStatus: 'invited' | 'registered' | string;
+};
+
+export type DashboardDailyPoint = {
+  day: string;
+  sent: number;
+  delivered: number;
+  read: number;
+  failed: number;
+};
+
+export type DashboardRecentCampaign = {
+  id: string;
+  name: string;
+  templateName: string;
+  status: string;
+  createdAt: string;
+  scheduledAt?: string | null;
+  totalRecipients: number;
+  sent: number;
+  delivered: number;
+  read: number;
+  failed: number;
+};
+
+export type DashboardStats = {
+  campaignsTotal: number;
+  messagesTotal: number;
+  sent: number;
+  delivered: number;
+  read: number;
+  failed: number;
+  scheduled: number;
+  activeRecurring: number;
+  activeSeries: number;
+  daily: DashboardDailyPoint[];
+  recentCampaigns: DashboardRecentCampaign[];
 };
