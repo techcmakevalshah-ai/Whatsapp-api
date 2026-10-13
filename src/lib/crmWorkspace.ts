@@ -1,5 +1,5 @@
 import { supabase } from './supabase';
-import type { FlowluLeadContext, FlowluLossReason, FlowluSalesMeta } from '../types';
+import type { FlowluLeadContext, FlowluLossReason, FlowluOption, FlowluSalesMeta } from '../types';
 
 export type CrmAccountOption = { id: number; name: string; phone: string; email: string };
 export type CrmOpportunityComment = { id: number; text: string; createdAt: string; authorId: number | null; authorName: string };
@@ -40,7 +40,7 @@ export function getCrmWorkspaceMeta() {
   return crmJson<FlowluSalesMeta>('/api/contacts?action=flowlu-meta');
 }
 
-export async function getCrmOpportunityBoard(filters: {
+export function getCrmOpportunityBoard(filters: {
   pipelineId: number;
   assigneeId?: number;
   sourceId?: number;
@@ -54,23 +54,7 @@ export async function getCrmOpportunityBoard(filters: {
   if (filters.assigneeId) params.set('assigneeId', String(filters.assigneeId));
   if (filters.sourceId) params.set('sourceId', String(filters.sourceId));
 
-  try {
-    const primary = await crmJson<{ contexts: FlowluLeadContext[]; leadCount: number }>(`/api/contacts?${params.toString()}`);
-    if (primary.contexts?.length || primary.leadCount > 0) return primary;
-  } catch {
-    // Fall through to the older audience reader. Some Flowlu accounts expose
-    // lead filters differently, so this keeps existing pipeline cards visible.
-  }
-
-  const fallback = new URLSearchParams({
-    action: 'flowlu-opportunity-audience',
-    pipelineId: String(filters.pipelineId),
-    dealStatus: filters.dealStatus || 'all',
-  });
-  if (filters.assigneeId) fallback.set('assigneeId', String(filters.assigneeId));
-  if (filters.sourceId) fallback.set('sourceId', String(filters.sourceId));
-  const data = await crmJson<{ contexts: FlowluLeadContext[]; leadCount: number }>(`/api/contacts?${fallback.toString()}`);
-  return { contexts: data.contexts || [], leadCount: data.leadCount || data.contexts?.length || 0 };
+  return crmJson<{ contexts: FlowluLeadContext[]; leadCount: number; stages: FlowluOption[] }>(`/api/contacts?${params.toString()}`);
 }
 
 export function getCrmOpportunityDetail(id: number) {
