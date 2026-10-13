@@ -12,23 +12,25 @@ export type WorkspacePipelineStage = {
   active: boolean;
 };
 
+type WorkspaceCard = {
+  accountId: number;
+  leadId: number;
+  leadName: string;
+  pipelineId: number | null;
+  stageId: number | null;
+  budget: number;
+  assigneeId: number | null;
+  sourceId: number | null;
+  status: WorkspaceDealStatus;
+  startDate: string;
+  deadline: string;
+  accountName: string;
+  accountPhone: string;
+  commentCount: number;
+};
+
 type WorkspaceBoardResult = {
-  contexts: Array<{
-    accountId: number;
-    leadId: number;
-    leadName: string;
-    pipelineId: number | null;
-    stageId: number | null;
-    budget: number;
-    assigneeId: number | null;
-    sourceId: number | null;
-    status: WorkspaceDealStatus;
-    startDate: string;
-    deadline: string;
-    accountName: string;
-    accountPhone: string;
-    commentCount: number;
-  }>;
+  contexts: WorkspaceCard[];
   leadCount: number;
   stages: WorkspacePipelineStage[];
   cached?: boolean;
@@ -40,8 +42,8 @@ const BOARD_FRESH_MS = 45 * 1000;
 const BOARD_STALE_MS = 10 * 60 * 1000;
 const STAGE_CACHE_MS = 10 * 60 * 1000;
 
-const boardCache = new Map<string, { freshUntil: number; staleUntil: number; value: WorkspaceBoardResult }>();
-const boardInFlight = new Map<string, Promise<WorkspaceBoardResult>>();
+const boardCache = new Map<number, { freshUntil: number; staleUntil: number; value: WorkspaceBoardResult }>();
+const boardInFlight = new Map<number, Promise<WorkspaceBoardResult>>();
 const stageCache = new Map<number, { expiresAt: number; value: WorkspacePipelineStage[] }>();
 
 function dealStatus(value: unknown): WorkspaceDealStatus {
@@ -49,13 +51,6 @@ function dealStatus(value: unknown): WorkspaceDealStatus {
   if (active === 2) return 'lost';
   if (active === 3) return 'won';
   return 'in_progress';
-}
-
-function dealStatusActive(status?: string) {
-  if (status === 'lost') return 2;
-  if (status === 'won') return 3;
-  if (status === 'in_progress') return 1;
-  return undefined;
 }
 
 function activeFlag(value: unknown) {
@@ -107,30 +102,14 @@ function normalizeStage(row: any, pipelineId: number): WorkspacePipelineStage | 
   };
 }
 
-function boardKey(input: {
-  pipelineId: number;
-  assigneeId?: number;
-  sourceId?: number;
-  dealStatus?: 'all' | WorkspaceDealStatus;
-}) {
-  return [
-    input.pipelineId,
-    input.assigneeId || 0,
-    input.sourceId || 0,
-    input.dealStatus || 'all',
-  ].join(':');
-}
-
 export function invalidateFlowluOpportunityWorkspaceCache(pipelineId?: number) {
   if (!pipelineId) {
     boardCache.clear();
     stageCache.clear();
     return;
   }
+  boardCache.delete(pipelineId);
   stageCache.delete(pipelineId);
-  for (const key of [...boardCache.keys()]) {
-    if (key.startsWith(String(pipelineId) + ':')) boardCache.delete(key);
-  }
 }
 
 async function fetchPipelineStages(pipelineId: number) {
@@ -168,37 +147,24 @@ async function fetchPipelineStages(pipelineId: number) {
   return stages;
 }
 
-async function buildFlowluOpportunityWorkspace(input: {
-  pipelineId: number;
-  assigneeId?: number;
-  sourceId?: number;
-  dealStatus?: 'all' | WorkspaceDealStatus;
-}): Promise<WorkspaceBoardResult> {
+async function buildPipelineSnapshot(pipelineId: number): Promise<WorkspaceBoardResult> {
   const leadsById = new Map<number, any>();
   let rowsSeen = 0;
 
   for (let page = 1; page <= 25; page += 1) {
-    const query: Record<string, string | number> = {
+    const data = await flowluGet('crm/lead/list', {
       page,
       limit: 200,
-      'filter[pipeline_id]': input.pipelineId,
-    };
-    if (input.assigneeId) query['filter[assignee_id]'] = input.assigneeId;
-    if (input.sourceId) query['filter[source_id]'] = input.sourceId;
-    const active = dealStatusActive(input.dealStatus);
-    if (active) query['filter[active]'] = active;
-
-    const data = await flowluGet('crm/lead/list', query);
+      'filter[pipeline_id]': pipelineId,
+    });
     const response = data?.response || {};
     const items = Array.isArray(response?.items) ? response.items : [];
     if (!items.length) break;
 
     for (const row of items) {
       const id = Number(row?.id || 0);
-      const pipelineId = Number(row?.pipeline_id || 0);
-      if (!id || pipelineId !== input.pipelineId) continue;
-      const status = dealStatus(row?.active);
-      if (input.dealStatus && input.dealStatus !== 'all' && status !== input.dealStatus) continue;
+      const rowPipelineId = Number(row?.pipeline_id || 0);
+      if (!id || rowPipelineId !== pipelineId) continue;
       leadsById.set(id, row);
     }
 
@@ -246,10 +212,10 @@ async function buildFlowluOpportunityWorkspace(input: {
       cachedContactById.set(contact.flowluId, { name: contact.name, phone: contact.phone });
     }
   } catch {
-    // CRM board must stay usable even when the local contact cache is unavailable.
+    // The board can still render names returned directly by Flowlu leads.
   }
 
-  const contexts = leads.map((row) => {
+  const contexts: WorkspaceCard[] = leads.map((row) => {
     const leadId = Number(row?.id || 0);
     const accountId = accountByLead.get(leadId) || 0;
     const cachedContact = accountId ? cachedContactById.get(accountId) : undefined;
@@ -278,13 +244,27 @@ async function buildFlowluOpportunityWorkspace(input: {
     };
   }).filter((item) => item.leadId > 0);
 
-  const stages = await fetchPipelineStages(input.pipelineId);
+  const stages = await fetchPipelineStages(pipelineId);
   return {
     contexts,
     leadCount: contexts.length,
     stages,
     fetchedAt: new Date().toISOString(),
   };
+}
+
+function filterSnapshot(snapshot: WorkspaceBoardResult, input: {
+  assigneeId?: number;
+  sourceId?: number;
+  dealStatus?: 'all' | WorkspaceDealStatus;
+}) {
+  const contexts = snapshot.contexts.filter((item) => {
+    if (input.assigneeId && item.assigneeId !== input.assigneeId) return false;
+    if (input.sourceId && item.sourceId !== input.sourceId) return false;
+    if (input.dealStatus && input.dealStatus !== 'all' && item.status !== input.dealStatus) return false;
+    return true;
+  });
+  return { ...snapshot, contexts, leadCount: contexts.length };
 }
 
 export async function getFlowluOpportunityWorkspace(input: {
@@ -296,19 +276,21 @@ export async function getFlowluOpportunityWorkspace(input: {
 }) {
   if (!Number.isFinite(input.pipelineId) || input.pipelineId <= 0) throw new Error('Choose a Flowlu pipeline.');
 
-  const key = boardKey(input);
-  const cached = boardCache.get(key);
+  const cached = boardCache.get(input.pipelineId);
   if (!input.force && cached && cached.freshUntil > Date.now()) {
-    return { ...cached.value, cached: true, stale: false };
+    return filterSnapshot({ ...cached.value, cached: true, stale: false }, input);
   }
 
-  const running = boardInFlight.get(key);
-  if (running) return running;
+  const running = boardInFlight.get(input.pipelineId);
+  if (running) {
+    const snapshot = await running;
+    return filterSnapshot(snapshot, input);
+  }
 
-  const task = buildFlowluOpportunityWorkspace(input)
+  const task = buildPipelineSnapshot(input.pipelineId)
     .then((value) => {
       const now = Date.now();
-      boardCache.set(key, {
+      boardCache.set(input.pipelineId, {
         freshUntil: now + BOARD_FRESH_MS,
         staleUntil: now + BOARD_STALE_MS,
         value,
@@ -316,16 +298,17 @@ export async function getFlowluOpportunityWorkspace(input: {
       return value;
     })
     .catch((error) => {
-      const stale = boardCache.get(key);
+      const stale = boardCache.get(input.pipelineId);
       if (stale && stale.staleUntil > Date.now()) {
         return { ...stale.value, cached: true, stale: true };
       }
       throw error;
     })
-    .finally(() => boardInFlight.delete(key));
+    .finally(() => boardInFlight.delete(input.pipelineId));
 
-  boardInFlight.set(key, task);
-  return task;
+  boardInFlight.set(input.pipelineId, task);
+  const snapshot = await task;
+  return filterSnapshot(snapshot, input);
 }
 
 export async function createFlowluPipelineStage(input: {
@@ -418,11 +401,9 @@ export async function getFlowluOpportunityDetail(leadId: number) {
     try {
       const cachedContacts = await readFlowluContactCache();
       const cached = cachedContacts?.contacts.find((item) => item.flowluId === accountId);
-      if (cached) {
-        account = { id: accountId, name: cached.name, phone: cached.phone, email: cached.email || '' };
-      }
+      if (cached) account = { id: accountId, name: cached.name, phone: cached.phone, email: cached.email || '' };
     } catch {
-      // Continue with the direct Flowlu fallback below.
+      // Continue with direct Flowlu fallback only for the opened record.
     }
 
     if (!account) {
