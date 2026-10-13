@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   ArrowLeft,
   BriefcaseBusiness,
@@ -27,7 +27,7 @@ import {
   type CrmAccountOption,
   type CrmOpportunityDetail,
 } from '../lib/crmWorkspace';
-import type { FlowluLeadContext, FlowluSalesMeta } from '../types';
+import type { FlowluLeadContext, FlowluOption, FlowluSalesMeta } from '../types';
 import './CrmOpportunityBoard.css';
 
 type DealFilter = 'in_progress' | 'won' | 'lost' | 'all';
@@ -98,8 +98,16 @@ export function CrmOpportunityBoard() {
   const loadMeta = async () => {
     const data = await getCrmWorkspaceMeta();
     setMeta(data);
+    const saved = Number(window.localStorage.getItem('crm_pipeline_id') || 0);
+    const savedExists = saved > 0 && data.pipelines.some((item) => item.id === saved);
+    const huf = data.pipelines.find((item) => /\bhuf\b|hindu undivided family/i.test(item.name));
     const first = data.pipelines[0]?.id || 0;
-    setPipelineId((current) => current && data.pipelines.some((item) => item.id === current) ? current : first);
+    setPipelineId((current) => {
+      if (current && data.pipelines.some((item) => item.id === current)) return current;
+      const next = savedExists ? saved : huf?.id || first;
+      if (next) window.localStorage.setItem('crm_pipeline_id', String(next));
+      return next;
+    });
     return data;
   };
 
@@ -109,6 +117,16 @@ export function CrmOpportunityBoard() {
       .catch((err) => setError(err instanceof Error ? err.message : 'Unable to load CRM setup.'))
       .finally(() => setLoading(false));
   }, []);
+
+  const choosePipeline = (nextId: number) => {
+    setPipelineId(nextId);
+    window.localStorage.setItem('crm_pipeline_id', String(nextId));
+    setAssigneeId(0);
+    setSourceId(0);
+    setQuery('');
+    setDealFilter('in_progress');
+    setContexts([]);
+  };
 
   const refresh = async () => {
     if (!pipelineId) return;
@@ -131,10 +149,19 @@ export function CrmOpportunityBoard() {
 
   useEffect(() => { void refresh(); }, [pipelineId, dealFilter, assigneeId, sourceId]);
 
-  const stages = useMemo(
-    () => (meta?.stages || []).filter((stage) => stage.pipelineId === pipelineId),
-    [meta?.stages, pipelineId],
-  );
+  const stages = useMemo<FlowluOption[]>(() => {
+    const allStages = meta?.stages || [];
+    const direct = allStages.filter((stage) => stage.pipelineId === pipelineId);
+    if (direct.length) return direct;
+
+    // Some Flowlu accounts return stage metadata without pipeline_id. When that
+    // happens, recover the stage headings from the stage IDs on the actual cards.
+    const usedIds = [...new Set(contexts.map((item) => item.stageId).filter((id): id is number => Boolean(id)))];
+    const recovered = allStages.filter((stage) => usedIds.includes(stage.id));
+    if (recovered.length) return recovered;
+
+    return usedIds.map((id) => ({ id, name: `Stage ${id}`, active: true, pipelineId }));
+  }, [meta?.stages, pipelineId, contexts]);
 
   const visible = useMemo(() => {
     const search = query.trim().toLowerCase();
@@ -338,33 +365,33 @@ export function CrmOpportunityBoard() {
     <section className="crm-v3">
       <header className="crm-v3-head">
         <div>
-          <div className="eyebrow"><BriefcaseBusiness size={15}/> CRM OPPORTUNITIES</div>
+          <div className="eyebrow"><BriefcaseBusiness size={14}/> CRM</div>
           <h1>Opportunities</h1>
-          <p>Drag cards between stages, create stages and keep the whole team conversation on the opportunity.</p>
+          <p>Move deals through stages and keep the team activity together.</p>
         </div>
         <div className="crm-v3-actions">
-          <label><span>Pipeline</span><div><select value={pipelineId} onChange={(event) => setPipelineId(Number(event.target.value))}>{(meta?.pipelines || []).map((pipeline) => <option value={pipeline.id} key={pipeline.id}>{pipeline.name}</option>)}</select><ChevronDown size={14}/></div></label>
-          <button className="stage-btn" onClick={() => setStageOpen(true)}><Plus size={16}/> Stage</button>
-          <button className="create-btn" onClick={() => openCreate()}><Plus size={17}/> Create Opportunity</button>
-          <button className="refresh-btn" onClick={() => void refresh()} disabled={loading}><RefreshCw size={16} className={loading ? 'spin' : ''}/></button>
+          <label className="pipeline-picker"><span>Pipeline</span><div><select value={pipelineId} onChange={(event) => choosePipeline(Number(event.target.value))}>{(meta?.pipelines || []).map((pipeline) => <option value={pipeline.id} key={pipeline.id}>{pipeline.name}</option>)}</select><ChevronDown size={13}/></div></label>
+          <button className="stage-btn" onClick={() => setStageOpen(true)}><Plus size={15}/> Stage</button>
+          <button className="create-btn" onClick={() => openCreate()}><Plus size={16}/> Create</button>
+          <button className="refresh-btn" onClick={() => void refresh()} disabled={loading}><RefreshCw size={15} className={loading ? 'spin' : ''}/></button>
         </div>
       </header>
 
       <nav className="crm-v3-tabs">
-        {([['in_progress','Active'],['won','Won'],['lost','Lost'],['all','All Opportunities']] as const).map(([value,label]) => <button key={value} className={dealFilter === value ? 'active' : ''} onClick={() => setDealFilter(value)}>{label}</button>)}
+        {([['in_progress','Kanban Board'],['won','Won'],['lost','Lost'],['all','All Opportunities']] as const).map(([value,label]) => <button key={value} className={dealFilter === value ? 'active' : ''} onClick={() => setDealFilter(value)}>{label}</button>)}
       </nav>
 
       {error && <div className="crm-v3-error">{error}</div>}
 
       <div className="crm-v3-toolbar">
-        <label className="search"><Search size={17}/><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search opportunities"/></label>
-        <button className="filter" title="Filters"><Filter size={17}/></button>
+        <label className="search"><Search size={16}/><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search"/></label>
+        <button className="filter" title="Filters"><Filter size={16}/></button>
         <select value={assigneeId} onChange={(event) => setAssigneeId(Number(event.target.value))}><option value={0}>All assignees</option>{(meta?.users || []).map((user) => <option value={user.id} key={user.id}>{user.name}</option>)}</select>
         <select value={sourceId} onChange={(event) => setSourceId(Number(event.target.value))}><option value={0}>All sources</option>{(meta?.sources || []).map((source) => <option value={source.id} key={source.id}>{source.name}</option>)}</select>
         <span className="count">{visible.length} opportunities</span>
       </div>
 
-      {loading && !contexts.length ? <div className="crm-v3-empty">Loading opportunities…</div> : !pipelineId ? <div className="crm-v3-empty">No active CRM pipeline was found.</div> : (
+      {loading && !contexts.length ? <div className="crm-v3-empty">Loading {selectedPipelineName}…</div> : !pipelineId ? <div className="crm-v3-empty">No active CRM pipeline was found.</div> : !stages.length ? <div className="crm-v3-empty">No stages returned for {selectedPipelineName}. Refresh once; existing opportunity stages will be recovered automatically.</div> : (
         <div className="crm-v3-board">
           {stages.map((stage, index) => {
             const cards = visible.filter((item) => item.stageId === stage.id);
@@ -381,7 +408,7 @@ export function CrmOpportunityBoard() {
               >
                 <header>
                   <div><strong>{stage.name}</strong><span>{cards.length} {cards.length === 1 ? 'Opportunity' : 'Opportunities'}</span><b>₹{money(total)}</b></div>
-                  <button onClick={() => openCreate(stage.id)} title={`Create in ${stage.name}`}><Plus size={17}/></button>
+                  <button onClick={() => openCreate(stage.id)} title={`Create in ${stage.name}`}><Plus size={16}/></button>
                 </header>
                 <div className="crm-v3-column-list">
                   {cards.map((item) => {
@@ -398,12 +425,12 @@ export function CrmOpportunityBoard() {
                       >
                         <div className="crm-v3-card-top"><strong>{item.leadName}</strong><span>#{item.leadId}</span></div>
                         <b className="budget">₹{money(item.budget)}</b>
-                        <div className="crm-v3-card-meta"><span><UserRound size={13}/>{owner}</span>{source && <span>{source}</span>}</div>
+                        <div className="crm-v3-card-meta"><span><UserRound size={12}/>{owner}</span>{source && <span>{source}</span>}</div>
                         <div className="crm-v3-card-foot"><small className={`deal-status ${item.status}`}>{item.status === 'in_progress' ? 'Active' : item.status === 'won' ? 'Won' : 'Lost'}</small>{item.accountId > 0 && <span>Contact #{item.accountId}</span>}</div>
                       </article>
                     );
                   })}
-                  {!cards.length && <div className="crm-v3-column-empty">Drop an opportunity here</div>}
+                  {!cards.length && <div className="crm-v3-column-empty">Drop opportunity here</div>}
                 </div>
               </section>
             );
@@ -446,23 +473,23 @@ export function CrmOpportunityBoard() {
         <div className="crm-v3-detail-backdrop">
           <section className="crm-v3-detail">
             <header className="detail-topbar">
-              <div><button className="back" onClick={() => { setSelected(null); setDetail(null); }}><ArrowLeft size={20}/></button><div><small>Opportunity #{selected.leadId}</small><h2>{detail?.opportunity.name || selected.leadName}</h2></div></div>
-              <div><button className="save-detail" disabled={detailSaving || detailLoading} onClick={() => void saveDetail()}><Save size={16}/>{detailSaving ? 'Saving…' : 'Save'}</button><button className="close" onClick={() => { setSelected(null); setDetail(null); }}><X size={19}/></button></div>
+              <div><button className="back" onClick={() => { setSelected(null); setDetail(null); }}><ArrowLeft size={18}/></button><div><small>Opportunity #{selected.leadId}</small><h2>{detail?.opportunity.name || selected.leadName}</h2></div></div>
+              <div><button className="save-detail" disabled={detailSaving || detailLoading} onClick={() => void saveDetail()}><Save size={15}/>{detailSaving ? 'Saving…' : 'Save'}</button><button className="close" onClick={() => { setSelected(null); setDetail(null); }}><X size={18}/></button></div>
             </header>
 
             {detailLoading || !detail ? <div className="detail-loading">Loading opportunity workspace…</div> : (
               <>
-                <div className="detail-tabs"><button className="active">Main</button><button>Activity Feed</button><button>Notes</button></div>
+                <div className="detail-tabs"><button className="active">Main</button><button>Activity</button><button>Notes</button></div>
                 <div className="detail-pipeline-name">{selectedPipelineName}</div>
                 <div className="detail-stage-ribbon">
                   {stages.map((stage, index) => <button key={stage.id} className={detailEdit.stageId === stage.id ? 'active' : ''} style={{ '--stage-color': stageColor(stage.id, index) } as React.CSSProperties} onClick={() => void setDetailStage(stage.id)}>{stage.name}</button>)}
                 </div>
 
                 <div className="detail-summary">
-                  <div><CircleDollarSign size={22}/><span><small>Amount</small><b>₹{money(detailEdit.budget)}</b></span></div>
-                  <div><CalendarDays size={22}/><span><small>Time Frames</small><b>{dateOnly(detail.opportunity.startDate)} → {dateOnly(detailEdit.deadline)}</b></span></div>
-                  <div><BriefcaseBusiness size={22}/><span><small>Source</small><b>{meta?.sources.find((item) => item.id === detailEdit.sourceId)?.name || 'Not set'}</b></span></div>
-                  <div><UserRound size={22}/><span><small>Owner</small><b>{meta?.users.find((item) => item.id === detailEdit.assigneeId)?.name || 'Unassigned'}</b></span></div>
+                  <div><CircleDollarSign size={19}/><span><small>Amount</small><b>₹{money(detailEdit.budget)}</b></span></div>
+                  <div><CalendarDays size={19}/><span><small>Time Frames</small><b>{dateOnly(detail.opportunity.startDate)} → {dateOnly(detailEdit.deadline)}</b></span></div>
+                  <div><BriefcaseBusiness size={19}/><span><small>Source</small><b>{meta?.sources.find((item) => item.id === detailEdit.sourceId)?.name || 'Not set'}</b></span></div>
+                  <div><UserRound size={19}/><span><small>Owner</small><b>{meta?.users.find((item) => item.id === detailEdit.assigneeId)?.name || 'Unassigned'}</b></span></div>
                 </div>
 
                 <div className="detail-layout">
@@ -478,7 +505,7 @@ export function CrmOpportunityBoard() {
                       <div className="two-fields"><label>Amount<input type="number" min={0} value={detailEdit.budget} onChange={(event) => setDetailEdit((current) => ({ ...current, budget: Number(event.target.value) }))}/></label><label>End Date<input type="date" value={detailEdit.deadline} onChange={(event) => setDetailEdit((current) => ({ ...current, deadline: event.target.value }))}/></label></div>
                       <label>Owner<select value={detailEdit.assigneeId} onChange={(event) => setDetailEdit((current) => ({ ...current, assigneeId: Number(event.target.value) }))}><option value={0}>Unassigned</option>{(meta?.users || []).map((user) => <option value={user.id} key={user.id}>{user.name}</option>)}</select></label>
                       <label>Source<select value={detailEdit.sourceId} onChange={(event) => setDetailEdit((current) => ({ ...current, sourceId: Number(event.target.value) }))}><option value={0}>No source</option>{(meta?.sources || []).map((source) => <option value={source.id} key={source.id}>{source.name}</option>)}</select></label>
-                      <label>Description<textarea rows={4} value={detailEdit.description} onChange={(event) => setDetailEdit((current) => ({ ...current, description: event.target.value }))}/></label>
+                      <label>Description<textarea rows={3} value={detailEdit.description} onChange={(event) => setDetailEdit((current) => ({ ...current, description: event.target.value }))}/></label>
                     </section>
 
                     <section className="detail-section outcome-box">
@@ -490,15 +517,15 @@ export function CrmOpportunityBoard() {
                   <main className="detail-feed">
                     <div className="feed-composer">
                       <div className="feed-avatar">{initials(meta?.users.find((item) => item.id === detailEdit.assigneeId)?.name || 'Team')}</div>
-                      <div><textarea value={commentText} onChange={(event) => setCommentText(event.target.value)} placeholder="Comment for your team or add an update…" rows={3}/><button disabled={commentSaving || !commentText.trim()} onClick={() => void postComment()}><Send size={15}/>{commentSaving ? 'Posting…' : 'Post Comment'}</button></div>
+                      <div><textarea value={commentText} onChange={(event) => setCommentText(event.target.value)} placeholder="Comment or schedule an activity…" rows={2}/><button disabled={commentSaving || !commentText.trim()} onClick={() => void postComment()}><Send size={14}/>{commentSaving ? 'Posting…' : 'Comment'}</button></div>
                     </div>
-                    <div className="planned-strip"><span>Planned</span><p>Comments and team updates for this opportunity appear below.</p></div>
+                    <div className="planned-strip"><span>Planned</span><p>Team updates and customer communication appear below.</p></div>
                     <div className="comment-feed">
                       {detail.comments.map((comment) => {
                         const author = comment.authorName || meta?.users.find((user) => user.id === comment.authorId)?.name || 'Team Member';
                         return <article key={`${comment.id}-${comment.createdAt}`}><span className="comment-avatar">{initials(author)}</span><div><header><b>{author}</b><small>{commentTime(comment.createdAt)}</small></header><p>{comment.text}</p></div></article>;
                       })}
-                      {!detail.comments.length && <div className="no-comments"><MessageSquare size={28}/><b>No comments yet</b><span>Post the first team update for this opportunity.</span></div>}
+                      {!detail.comments.length && <div className="no-comments"><MessageSquare size={24}/><b>No comments yet</b><span>Post the first team update.</span></div>}
                     </div>
                   </main>
                 </div>
