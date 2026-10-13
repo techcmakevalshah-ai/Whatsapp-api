@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import { Bell, ChevronDown, LogOut } from 'lucide-react';
-import { FlowluTasksBoard } from './FlowluTasksBoard';
+import { TaskWorkspace } from './TaskWorkspace';
 import { Login } from './Login';
 import { Sidebar, type AppPage } from './Sidebar';
 import { getCurrentStaffProfile } from '../lib/api';
@@ -55,6 +55,7 @@ export function FlowluTasksEntry() {
 
   const navigateFromTasks = (target: AppPage) => {
     if (target === 'tasks') return;
+    if (target === 'crm') return window.location.assign('/crm');
     window.location.assign('/');
   };
 
@@ -94,12 +95,7 @@ export function FlowluTasksEntry() {
 
       <main className="main">
         <header className="topbar">
-          <div>
-            <span>Workspace</span>
-            <b>›</b>
-            <span>Tasks</span>
-          </div>
-
+          <div><span>Workspace</span><b>›</b><span>Tasks</span></div>
           <div className="user">
             <Bell size={18}/>
             <span className="avatar">{profileInitials}</span>
@@ -108,20 +104,12 @@ export function FlowluTasksEntry() {
               <span>{profile?.role === 'admin' ? 'Admin' : 'Team'}</span>
             </div>
             <ChevronDown size={15}/>
-            {supabase && (
-              <button
-                className="icon-btn"
-                title="Sign out"
-                onClick={() => void supabase.auth.signOut()}
-              >
-                <LogOut size={17}/>
-              </button>
-            )}
+            {supabase && <button className="icon-btn" title="Sign out" onClick={() => void supabase.auth.signOut()}><LogOut size={17}/></button>}
           </div>
         </header>
 
         <div className="content tasks-content">
-          <FlowluTasksBoard />
+          <TaskWorkspace />
         </div>
       </main>
     </div>
