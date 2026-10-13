@@ -2,8 +2,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { BriefcaseBusiness, ChevronDown, Filter, RefreshCw, Search, X } from 'lucide-react';
 import { getFlowluSalesMeta } from '../lib/api';
 import { getFlowluOpportunityBoard } from '../lib/flowluOpportunityBoard';
-import { updateFlowluOpportunity } from '../lib/flowluOpportunityControl';
-import type { FlowluLeadContext, FlowluSalesMeta } from '../types';
+import { getFlowluContactOpportunities, updateFlowluOpportunity } from '../lib/flowluOpportunityControl';
+import type { FlowluLeadContext, FlowluLossReason, FlowluSalesMeta } from '../types';
 import './CrmOpportunityBoard.css';
 
 type DealFilter = 'in_progress' | 'won' | 'lost' | 'all';
@@ -24,6 +24,8 @@ export function CrmOpportunityBoard() {
   const [error, setError] = useState('');
   const [selected, setSelected] = useState<FlowluLeadContext | null>(null);
   const [working, setWorking] = useState(false);
+  const [lossReasons, setLossReasons] = useState<FlowluLossReason[]>([]);
+  const [lossReasonId, setLossReasonId] = useState(0);
   const [edit, setEdit] = useState({ stageId: 0, assigneeId: 0, sourceId: 0, budget: 0 });
 
   useEffect(() => {
@@ -55,8 +57,16 @@ export function CrmOpportunityBoard() {
   useEffect(() => { void refresh(); }, [pipelineId, dealFilter, assigneeId, sourceId]);
 
   useEffect(() => {
-    if (!selected) return;
+    if (!selected) {
+      setLossReasons([]);
+      setLossReasonId(0);
+      return;
+    }
     setEdit({ stageId: selected.stageId || 0, assigneeId: selected.assigneeId || 0, sourceId: selected.sourceId || 0, budget: selected.budget || 0 });
+    setLossReasonId(0);
+    void getFlowluContactOpportunities(selected.accountId)
+      .then((data) => setLossReasons(data.lossReasons || []))
+      .catch(() => setLossReasons([]));
   }, [selected?.leadId]);
 
   const stages = useMemo(() => (meta?.stages || []).filter((stage) => stage.pipelineId === pipelineId), [meta?.stages, pipelineId]);
@@ -80,9 +90,14 @@ export function CrmOpportunityBoard() {
 
   const statusAction = async (action: 'won' | 'lost' | 'reopen') => {
     if (!selected) return;
+    if (action === 'lost' && !lossReasonId) {
+      setError('Choose a loss reason before marking this opportunity Lost.');
+      return;
+    }
     setWorking(true);
+    setError('');
     try {
-      await updateFlowluOpportunity({ id: selected.leadId, opportunityAction: action });
+      await updateFlowluOpportunity({ id: selected.leadId, opportunityAction: action, lossReasonId: action === 'lost' ? lossReasonId : undefined });
       setSelected(null);
       await refresh();
     } catch (err) {
@@ -121,7 +136,7 @@ export function CrmOpportunityBoard() {
         </div>
       )}
 
-      {selected && <div className="crm-v2-backdrop" onMouseDown={(event) => event.target === event.currentTarget && setSelected(null)}><aside className="crm-v2-drawer"><header><div><small>Opportunity #{selected.leadId}</small><h2>{selected.leadName}</h2></div><button onClick={() => setSelected(null)}><X size={18}/></button></header><div className="crm-v2-form"><label>Pipeline<select value={pipelineId} disabled>{(meta?.pipelines || []).map((pipeline) => <option value={pipeline.id} key={pipeline.id}>{pipeline.name}</option>)}</select></label><label>Stage<select value={edit.stageId} onChange={(event) => setEdit((current) => ({ ...current, stageId: Number(event.target.value) }))}>{stages.map((stage) => <option value={stage.id} key={stage.id}>{stage.name}</option>)}</select></label><label>Budget<input type="number" min={0} value={edit.budget} onChange={(event) => setEdit((current) => ({ ...current, budget: Number(event.target.value) }))}/></label><label>Assignee<select value={edit.assigneeId} onChange={(event) => setEdit((current) => ({ ...current, assigneeId: Number(event.target.value) }))}><option value={0}>Unassigned</option>{(meta?.users || []).map((user) => <option value={user.id} key={user.id}>{user.name}</option>)}</select></label><label>Source<select value={edit.sourceId} onChange={(event) => setEdit((current) => ({ ...current, sourceId: Number(event.target.value) }))}><option value={0}>No source</option>{(meta?.sources || []).map((source) => <option value={source.id} key={source.id}>{source.name}</option>)}</select></label><button className="save" disabled={working} onClick={() => void save()}>{working ? 'Saving…' : 'Save Changes'}</button></div><div className="crm-v2-outcome">{selected.status === 'in_progress' ? <><button className="won" disabled={working} onClick={() => void statusAction('won')}>Mark Won</button><button className="lost" disabled={working} onClick={() => void statusAction('lost')}>Mark Lost</button></> : <button disabled={working} onClick={() => void statusAction('reopen')}>Reopen Opportunity</button>}</div></aside></div>}
+      {selected && <div className="crm-v2-backdrop" onMouseDown={(event) => event.target === event.currentTarget && setSelected(null)}><aside className="crm-v2-drawer"><header><div><small>Opportunity #{selected.leadId}</small><h2>{selected.leadName}</h2></div><button onClick={() => setSelected(null)}><X size={18}/></button></header><div className="crm-v2-form"><label>Pipeline<select value={pipelineId} disabled>{(meta?.pipelines || []).map((pipeline) => <option value={pipeline.id} key={pipeline.id}>{pipeline.name}</option>)}</select></label><label>Stage<select value={edit.stageId} onChange={(event) => setEdit((current) => ({ ...current, stageId: Number(event.target.value) }))}>{stages.map((stage) => <option value={stage.id} key={stage.id}>{stage.name}</option>)}</select></label><label>Budget<input type="number" min={0} value={edit.budget} onChange={(event) => setEdit((current) => ({ ...current, budget: Number(event.target.value) }))}/></label><label>Assignee<select value={edit.assigneeId} onChange={(event) => setEdit((current) => ({ ...current, assigneeId: Number(event.target.value) }))}><option value={0}>Unassigned</option>{(meta?.users || []).map((user) => <option value={user.id} key={user.id}>{user.name}</option>)}</select></label><label>Source<select value={edit.sourceId} onChange={(event) => setEdit((current) => ({ ...current, sourceId: Number(event.target.value) }))}><option value={0}>No source</option>{(meta?.sources || []).map((source) => <option value={source.id} key={source.id}>{source.name}</option>)}</select></label>{selected.status === 'in_progress' && <label>Loss reason<select value={lossReasonId} onChange={(event) => setLossReasonId(Number(event.target.value))}><option value={0}>Choose only when marking Lost</option>{lossReasons.map((reason) => <option value={reason.id} key={reason.id}>{reason.name}</option>)}</select></label>}<button className="save" disabled={working} onClick={() => void save()}>{working ? 'Saving…' : 'Save Changes'}</button></div><div className="crm-v2-outcome">{selected.status === 'in_progress' ? <><button className="won" disabled={working} onClick={() => void statusAction('won')}>Mark Won</button><button className="lost" disabled={working} onClick={() => void statusAction('lost')}>Mark Lost</button></> : <button disabled={working} onClick={() => void statusAction('reopen')}>Reopen Opportunity</button>}</div></aside></div>}
     </section>
   );
 }
