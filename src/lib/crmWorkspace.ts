@@ -37,7 +37,7 @@ async function crmJson<T>(url: string, init?: RequestInit): Promise<T> {
 }
 
 export function getCrmWorkspaceMeta() {
-  return crmJson<FlowluSalesMeta>('/api/crm-workspace?action=meta');
+  return crmJson<FlowluSalesMeta>('/api/contacts?action=flowlu-meta');
 }
 
 export function getCrmOpportunityBoard(filters: {
@@ -46,14 +46,18 @@ export function getCrmOpportunityBoard(filters: {
   sourceId?: number;
   dealStatus?: 'all' | 'in_progress' | 'won' | 'lost';
 }) {
-  const params = new URLSearchParams({ action: 'board', pipelineId: String(filters.pipelineId), dealStatus: filters.dealStatus || 'all' });
+  const params = new URLSearchParams({
+    action: 'flowlu-opportunity-board',
+    pipelineId: String(filters.pipelineId),
+    dealStatus: filters.dealStatus || 'all',
+  });
   if (filters.assigneeId) params.set('assigneeId', String(filters.assigneeId));
   if (filters.sourceId) params.set('sourceId', String(filters.sourceId));
-  return crmJson<{ contexts: FlowluLeadContext[]; leadCount: number }>(`/api/crm-workspace?${params.toString()}`);
+  return crmJson<{ contexts: FlowluLeadContext[]; leadCount: number }>(`/api/contacts?${params.toString()}`);
 }
 
 export function getCrmOpportunityDetail(id: number) {
-  return crmJson<CrmOpportunityDetail>(`/api/crm-workspace?action=detail&id=${encodeURIComponent(String(id))}`);
+  return crmJson<CrmOpportunityDetail>(`/api/contacts?action=flowlu-opportunity-detail&id=${encodeURIComponent(String(id))}`);
 }
 
 export function updateCrmOpportunity(payload: {
@@ -70,7 +74,7 @@ export function updateCrmOpportunity(payload: {
   lossReasonId?: number;
   closingComment?: string;
 }) {
-  return crmJson<{ ok: true; opportunity: unknown }>('/api/crm-workspace?action=opportunity-update', {
+  return crmJson<{ ok: true; opportunity: unknown }>('/api/contacts?action=flowlu-opportunity-update', {
     method: 'PATCH', body: JSON.stringify(payload),
   });
 }
@@ -84,23 +88,23 @@ export function createCrmOpportunity(payload: {
   sourceId?: number;
   accountId?: number;
 }) {
-  return crmJson<{ ok: true; opportunityId: number }>('/api/crm-workspace?action=opportunity-create', {
+  return crmJson<{ ok: true; opportunityId: number }>('/api/contacts?action=flowlu-opportunity-board-create', {
     method: 'POST', body: JSON.stringify(payload),
   });
 }
 
 export function createCrmStage(payload: { pipelineId: number; name: string; color: string }) {
-  return crmJson<{ ok: true; stage: { id: number; name: string; color: string | null } }>('/api/crm-workspace?action=stage-create', {
+  return crmJson<{ ok: true; stage: { id: number; name: string; color: string | null } }>('/api/contacts?action=flowlu-opportunity-stage-create', {
     method: 'POST', body: JSON.stringify(payload),
   });
 }
 
 export function searchCrmAccounts(search: string) {
-  return crmJson<{ accounts: CrmAccountOption[] }>(`/api/crm-workspace?action=account-search&search=${encodeURIComponent(search)}`);
+  return crmJson<{ accounts: CrmAccountOption[] }>(`/api/contacts?action=flowlu-account-search&search=${encodeURIComponent(search)}`);
 }
 
 export function createCrmOpportunityComment(leadId: number, text: string) {
-  return crmJson<{ ok: true; commentId: number | null }>('/api/crm-workspace?action=comment-create', {
+  return crmJson<{ ok: true; commentId: number | null }>('/api/contacts?action=flowlu-opportunity-comment', {
     method: 'POST', body: JSON.stringify({ leadId, text }),
   });
 }
