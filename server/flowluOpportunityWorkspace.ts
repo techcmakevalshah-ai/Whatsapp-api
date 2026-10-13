@@ -43,6 +43,18 @@ function chunk<T>(items: T[], size: number) {
   return output;
 }
 
+async function mapWithConcurrency<T>(items: T[], concurrency: number, worker: (item: T) => Promise<void>) {
+  let cursor = 0;
+  const runners = Array.from({ length: Math.min(concurrency, items.length) }, async () => {
+    while (cursor < items.length) {
+      const index = cursor;
+      cursor += 1;
+      await worker(items[index]);
+    }
+  });
+  await Promise.all(runners);
+}
+
 export async function getFlowluOpportunityWorkspace(input: {
   pipelineId: number;
   assigneeId?: number;
@@ -108,7 +120,7 @@ export async function getFlowluOpportunityWorkspace(input: {
     }
   }
 
-  const contexts = leads.map((row) => ({
+  const baseContexts = leads.map((row) => ({
     accountId: accountByLead.get(Number(row?.id || 0)) || 0,
     leadId: Number(row?.id || 0),
     leadName: String(row?.name || 'Opportunity').trim() || 'Opportunity',
@@ -121,6 +133,44 @@ export async function getFlowluOpportunityWorkspace(input: {
     startDate: String(row?.start_date || row?.created || '').trim(),
     deadline: String(row?.deadline || '').trim(),
   })).filter((item) => item.leadId > 0);
+
+  const accountInfo = new Map<number, { name: string; phone: string }>();
+  const accountIds = [...new Set(baseContexts.map((item) => item.accountId).filter((id) => id > 0))];
+  await mapWithConcurrency(accountIds, 8, async (accountId) => {
+    try {
+      const data = await flowluGet('crm/account/get/' + accountId);
+      const row = data?.response || {};
+      const name = String(row?.name || '').trim() || [row?.first_name, row?.last_name]
+        .map((part) => String(part || '').trim())
+        .filter(Boolean)
+        .join(' ');
+      const phone = String(row?.phone || row?.phone_work || row?.phone_mobile || '').trim();
+      accountInfo.set(accountId, { name: name || `Contact #${accountId}`, phone });
+    } catch {
+      accountInfo.set(accountId, { name: `Contact #${accountId}`, phone: '' });
+    }
+  });
+
+  const commentCountByLead = new Map<number, number>();
+  const countableLeads = baseContexts.slice(0, 80).map((item) => item.leadId);
+  await mapWithConcurrency(countableLeads, 8, async (leadId) => {
+    try {
+      const data = await flowluGet('crm/lead/' + leadId + '/comments/list', { page: 1, limit: 1 });
+      const response = data?.response || {};
+      const items = Array.isArray(response?.items) ? response.items : [];
+      const total = Number(response?.total || 0);
+      commentCountByLead.set(leadId, total > 0 ? total : items.length);
+    } catch {
+      commentCountByLead.set(leadId, 0);
+    }
+  });
+
+  const contexts = baseContexts.map((item) => ({
+    ...item,
+    accountName: item.accountId ? accountInfo.get(item.accountId)?.name || `Contact #${item.accountId}` : '',
+    accountPhone: item.accountId ? accountInfo.get(item.accountId)?.phone || '' : '',
+    commentCount: commentCountByLead.get(item.leadId) || 0,
+  }));
 
   return { contexts, leadCount: contexts.length };
 }
