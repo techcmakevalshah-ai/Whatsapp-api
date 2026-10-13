@@ -40,7 +40,7 @@ export function getCrmWorkspaceMeta() {
   return crmJson<FlowluSalesMeta>('/api/contacts?action=flowlu-meta');
 }
 
-export function getCrmOpportunityBoard(filters: {
+export async function getCrmOpportunityBoard(filters: {
   pipelineId: number;
   assigneeId?: number;
   sourceId?: number;
@@ -53,7 +53,24 @@ export function getCrmOpportunityBoard(filters: {
   });
   if (filters.assigneeId) params.set('assigneeId', String(filters.assigneeId));
   if (filters.sourceId) params.set('sourceId', String(filters.sourceId));
-  return crmJson<{ contexts: FlowluLeadContext[]; leadCount: number }>(`/api/contacts?${params.toString()}`);
+
+  try {
+    const primary = await crmJson<{ contexts: FlowluLeadContext[]; leadCount: number }>(`/api/contacts?${params.toString()}`);
+    if (primary.contexts?.length || primary.leadCount > 0) return primary;
+  } catch {
+    // Fall through to the older audience reader. Some Flowlu accounts expose
+    // lead filters differently, so this keeps existing pipeline cards visible.
+  }
+
+  const fallback = new URLSearchParams({
+    action: 'flowlu-opportunity-audience',
+    pipelineId: String(filters.pipelineId),
+    dealStatus: filters.dealStatus || 'all',
+  });
+  if (filters.assigneeId) fallback.set('assigneeId', String(filters.assigneeId));
+  if (filters.sourceId) fallback.set('sourceId', String(filters.sourceId));
+  const data = await crmJson<{ contexts: FlowluLeadContext[]; leadCount: number }>(`/api/contacts?${fallback.toString()}`);
+  return { contexts: data.contexts || [], leadCount: data.leadCount || data.contexts?.length || 0 };
 }
 
 export function getCrmOpportunityDetail(id: number) {
