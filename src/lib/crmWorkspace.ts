@@ -31,13 +31,20 @@ type CrmBoardResult = {
   fetchedAt?: string;
 };
 
+type BoardFilters = {
+  pipelineId: number;
+  assigneeId?: number;
+  sourceId?: number;
+  dealStatus?: 'all' | 'in_progress' | 'won' | 'lost';
+};
+
 type StoredValue<T> = { savedAt: number; value: T };
 
 const META_KEY = 'crm_workspace_meta_v3';
-const BOARD_PREFIX = 'crm_board_v3:';
+const BOARD_PREFIX = 'crm_board_pipeline_v4:';
 const META_FRESH_MS = 30 * 60 * 1000;
 const META_STALE_MS = 24 * 60 * 60 * 1000;
-const BOARD_FRESH_MS = 30 * 1000;
+const BOARD_FRESH_MS = 45 * 1000;
 const BOARD_STALE_MS = 30 * 60 * 1000;
 
 let latestMeta: FlowluSalesMeta | null = null;
@@ -62,18 +69,8 @@ function storageSet<T>(key: string, value: T) {
   }
 }
 
-function boardStorageKey(filters: {
-  pipelineId: number;
-  assigneeId?: number;
-  sourceId?: number;
-  dealStatus?: 'all' | 'in_progress' | 'won' | 'lost';
-}) {
-  return BOARD_PREFIX + [
-    filters.pipelineId,
-    filters.assigneeId || 0,
-    filters.sourceId || 0,
-    filters.dealStatus || 'all',
-  ].join(':');
+function boardStorageKey(pipelineId: number) {
+  return BOARD_PREFIX + pipelineId;
 }
 
 function clearBoardStorage() {
@@ -85,6 +82,25 @@ function clearBoardStorage() {
   } catch {
     // Ignore storage failures.
   }
+}
+
+function filterBoard(base: CrmBoardResult, filters: BoardFilters): CrmBoardResult {
+  const contexts = (base.contexts || []).filter((item) => {
+    if (filters.assigneeId && item.assigneeId !== filters.assigneeId) return false;
+    if (filters.sourceId && item.sourceId !== filters.sourceId) return false;
+    if (filters.dealStatus && filters.dealStatus !== 'all' && item.status !== filters.dealStatus) return false;
+    return true;
+  });
+  return { ...base, contexts, leadCount: contexts.length };
+}
+
+function mergeBoardStages(data: CrmBoardResult, pipelineId: number) {
+  if (!latestMeta || !Array.isArray(data.stages) || !data.stages.length) return;
+  latestMeta.stages = [
+    ...latestMeta.stages.filter((stage) => stage.pipelineId !== pipelineId),
+    ...data.stages,
+  ];
+  storageSet(META_KEY, latestMeta);
 }
 
 async function crmJson<T>(url: string, init?: RequestInit): Promise<T> {
@@ -124,57 +140,32 @@ export async function getCrmWorkspaceMeta() {
   }
 }
 
-export async function getCrmOpportunityBoard(filters: {
-  pipelineId: number;
-  assigneeId?: number;
-  sourceId?: number;
-  dealStatus?: 'all' | 'in_progress' | 'won' | 'lost';
-}) {
-  const storageKey = boardStorageKey(filters);
+export async function getCrmOpportunityBoard(filters: BoardFilters) {
+  const storageKey = boardStorageKey(filters.pipelineId);
   const stored = storageGet<CrmBoardResult>(storageKey);
 
   if (stored && Date.now() - stored.savedAt < BOARD_FRESH_MS) {
     const cached = { ...stored.value, cached: true, stale: false };
-    if (latestMeta && cached.stages?.length) {
-      latestMeta.stages = [
-        ...latestMeta.stages.filter((stage) => stage.pipelineId !== filters.pipelineId),
-        ...cached.stages,
-      ];
-    }
-    return cached;
+    mergeBoardStages(cached, filters.pipelineId);
+    return filterBoard(cached, filters);
   }
 
   const params = new URLSearchParams({
     action: 'flowlu-opportunity-board',
     pipelineId: String(filters.pipelineId),
-    dealStatus: filters.dealStatus || 'all',
+    dealStatus: 'all',
   });
-  if (filters.assigneeId) params.set('assigneeId', String(filters.assigneeId));
-  if (filters.sourceId) params.set('sourceId', String(filters.sourceId));
 
   try {
     const data = await crmJson<CrmBoardResult>(`/api/contacts?${params.toString()}`);
-
-    if (latestMeta && Array.isArray(data.stages) && data.stages.length) {
-      latestMeta.stages = [
-        ...latestMeta.stages.filter((stage) => stage.pipelineId !== filters.pipelineId),
-        ...data.stages,
-      ];
-      storageSet(META_KEY, latestMeta);
-    }
-
+    mergeBoardStages(data, filters.pipelineId);
     storageSet(storageKey, data);
-    return data;
+    return filterBoard(data, filters);
   } catch (error) {
     if (stored && Date.now() - stored.savedAt < BOARD_STALE_MS) {
       const cached = { ...stored.value, cached: true, stale: true };
-      if (latestMeta && cached.stages?.length) {
-        latestMeta.stages = [
-          ...latestMeta.stages.filter((stage) => stage.pipelineId !== filters.pipelineId),
-          ...cached.stages,
-        ];
-      }
-      return cached;
+      mergeBoardStages(cached, filters.pipelineId);
+      return filterBoard(cached, filters);
     }
     throw error;
   }
