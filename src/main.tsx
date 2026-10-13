@@ -4,6 +4,7 @@ import App from './App';
 import { CrmEntry } from './components/CrmEntry';
 import { FlowluTasksEntry } from './components/FlowluTasksEntry';
 import './styles.css';
+import './components/CrmOpportunityBoardRefine.css';
 
 const pathname = window.location.pathname.replace(/\/+$/, '') || '/';
 
